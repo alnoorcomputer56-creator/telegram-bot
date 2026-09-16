@@ -34,7 +34,7 @@ function escapeHtml(str) {
     return String(str)
         .replace(/&/g, "&")
         .replace(/</g, ">")
-        .replace(/"/g, "");
+        .replace(/"/g, """);
 }
 
 const COUNTRY_DIAL_CODES = [
@@ -272,7 +272,7 @@ bot.callbackQuery(/^delapi_/, async (ctx) => {
     if (dbData.apiUrls[idx]) {
         const removed = dbData.apiUrls.splice(idx, 1);
         writeDb(dbData);
-        await ctx.editMessageText(`✅ API URL ডিলিট করা হয়েছে:\n`${escapeHtml(removed[0])}``, { parse_mode: "HTML" }).catch(()=>{});
+        await ctx.editMessageText(`✅ API URL ডিলিট করা হয়েছে:\n ${escapeHtml(removed[0])}`, { parse_mode: "HTML" }).catch(()=>{});
     }
     ctx.answerCallbackQuery().catch(()=>{});
 });
