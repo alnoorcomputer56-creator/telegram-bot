@@ -352,8 +352,8 @@ bot.hears("💰 Balance", async (ctx) => {
     const balance = (dbData.balances[userId] || 0).toFixed(2);
 
     let text = `💵 **Your Current Balance**\n\n`;
-    text += `👤 User ID: `${userId}`\n`;
-    text += `💰 Balance: `৳${balance}` BDT\n\n`;
+    text += `👤 User ID: ${userId}\n`;
+    text += `💰 Balance: ৳${balance} BDT\n\n`;
     text += `📌 Minimum withdrawal limit is **৳100.00 BDT**.`;
 
     await ctx.reply(text, { parse_mode: "HTML" }).catch(()=>{});
@@ -365,12 +365,12 @@ bot.hears("💳 Withdraw", async (ctx) => {
     const balance = dbData.balances[userId] || 0;
 
     if (balance < 100) {
-        await ctx.reply(`❌ **উইথড্র করতে ব্যর্থ!**\n\nআপনার বর্তমান ব্যালেন্স: `৳${balance.toFixed(2)}` BDT\nসর্বনিম্ন উইথড্র রিকোয়েস্ট পরিমাণ: `৳100.00` BDT`, { parse_mode: "HTML" }).catch(()=>{});
+        await ctx.reply(`❌ **উইথড্র করতে ব্যর্থ!**\n\nআপনার বর্তমান ব্যালেন্স: ৳ ${balance.toFixed(2)} BDT\nসর্বনিম্ন উইথড্র রিকোয়েস্ট পরিমাণ: `৳100.00` BDT`, { parse_mode: "HTML" }).catch(()=>{});
         return;
     }
 
     userState[userId] = { step: "awaiting_binance_id" };
-    await ctx.reply(`💳 **Withdrawal Request**\n\nআপনার বর্তমান ব্যালেন্স: `৳${balance.toFixed(2)}` BDT\n\nঅনুগ্রহ করে আপনার **Binance Pay ID / bKash / Nagad Number** টি লিখে পাঠান:`, { parse_mode: "HTML" }).catch(()=>{});
+    await ctx.reply(`💳 **Withdrawal Request**\n\nআপনার বর্তমান ব্যালেন্স: ৳${balance.toFixed(2)} BDT\n\nঅনুগ্রহ করে আপনার **Binance Pay ID / bKash / Nagad Number** টি লিখে পাঠান:`, { parse_mode: "HTML" }).catch(()=>{});
 });
 
 bot.hears("🚦 Live Traffic", async (ctx) => {
@@ -379,8 +379,8 @@ bot.hears("🚦 Live Traffic", async (ctx) => {
     const activeCheckersCount = Object.keys(activeOtpCheckers).length;
     
     let infoText = `🚦 **Live Traffic Status**\n\n`;
-    infoText += `🟢 Available Numbers in Stock: `${availableCount}`\n`;
-    infoText += `⚡ Active OTP Requests Right Now: `${activeCheckersCount}`\n\n`;
+    infoText += `🟢 Available Numbers in Stock: ${availableCount}\n`;
+    infoText += `⚡ Active OTP Requests Right Now: ${activeCheckersCount}\n\n`;
     infoText += `🚀 Bot is running smooth and ready to deliver numbers!`;
     
     await ctx.reply(infoText, { parse_mode: "HTML" }).catch(()=>{});
@@ -395,11 +395,11 @@ bot.hears("📊 Status", async (ctx) => {
     const totalServices = dbData.services.length;
 
     let statusText = `📊 **Bot Statistics Overview**\n\n`;
-    statusText += `👥 Total Users: `${totalUsers}`\n`;
-    statusText += `🛠️ Total Services Active: `${totalServices}`\n`;
-    statusText += `📱 Total Numbers in DB: `${totalNumbers}`\n`;
-    statusText += `🟩 Available Numbers: `${availableNumbers}`\n`;
-    statusText += `🟥 Used/Processing Numbers: `${usedNumbers}`\n`;
+    statusText += `👥 Total Users: ${totalUsers}\n`;
+    statusText += `🛠️ Total Services Active: ${totalServices}\n`;
+    statusText += `📱 Total Numbers in DB: ${totalNumbers}\n`;
+    statusText += `🟩 Available Numbers: ${availableNumbers}\n`;
+    statusText += `🟥 Used/Processing Numbers: ${usedNumbers}\n`;
 
     await ctx.reply(statusText, { parse_mode: "HTML" }).catch(()=>{});
 });
