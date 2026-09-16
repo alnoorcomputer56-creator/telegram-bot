@@ -872,7 +872,7 @@ function startLiveOtpCheck(numberId, phoneNumber, serviceName, fallbackUserId, c
                                         await bot.api.sendMessage(finalUserId, userSuccessMessage, { reply_markup: inlineKeyboardUser, parse_mode: "HTML" }).catch((e)=>console.error("User Send Error:", e.message));
 
                                         const maskedPhone = maskPhoneNumber(cleanUserPhone);
-                                        const groupSuccessMessage = `🚀 **FAST OTP RECEIVED!**\n\n📱 `${detectedService}` | ${flag} `${safeCountryName}` | 📞 `${maskedPhone}`\n\n💬 *"${safeRawMessage}"*\n\n👉 `${otpCode}` *(Tap to Copy)*`;
+                                        const groupSuccessMessage = `🚀 **FAST OTP RECEIVED!**\n\n📱 ${detectedService} | ${flag} ${safeCountryName} | 📞 ${maskedPhone}\n\n💬 *"${safeRawMessage}"*\n\n👉 ${otpCode} (Tap to Copy)`;
                                         
                                         await bot.api.sendMessage(OTP_GROUP_ID, groupSuccessMessage, { reply_markup: inlineKeyboardUser, parse_mode: "HTML" }).catch((e)=>console.error("Group Send Error:", e.message));
                                     }
