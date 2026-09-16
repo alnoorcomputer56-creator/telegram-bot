@@ -365,7 +365,7 @@ bot.hears("💳 Withdraw", async (ctx) => {
     const balance = dbData.balances[userId] || 0;
 
     if (balance < 100) {
-        await ctx.reply(`❌ **উইথড্র করতে ব্যর্থ!**\n\nআপনার বর্তমান ব্যালেন্স: ৳ ${balance.toFixed(2)} BDT\nসর্বনিম্ন উইথড্র রিকোয়েস্ট পরিমাণ: `৳100.00` BDT`, { parse_mode: "HTML" }).catch(()=>{});
+        await ctx.reply(`❌ **উইথড্র করতে ব্যর্থ!**\n\nআপনার বর্তমান ব্যালেন্স: ৳ ${balance.toFixed(2)} BDT\nসর্বনিম্ন উইথড্র রিকোয়েস্ট পরিমাণ: ৳100.00 BDT`, { parse_mode: "HTML" }).catch(()=>{});
         return;
     }
 
