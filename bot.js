@@ -444,7 +444,7 @@ bot.hears("📋 List Services", async (ctx) => {
     let text = `📋 **Active Services & Rates**\n\n`;
     dbData.services.forEach((s, idx) => {
         const rate = dbData.serviceRates[s] ? `৳${dbData.serviceRates[s].toFixed(2)} BDT` : "Default (৳5.00)";
-        text += `${idx + 1}. **${escapeHtml(s)}** - Rate: `${rate}`\n`;
+        text += `${idx + 1}. **${escapeHtml(s)}** - Rate: ${rate}\n`;
     });
     
     await ctx.reply(text, { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(()=>{});
