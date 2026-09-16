@@ -1032,11 +1032,11 @@ bot.hears("💸 Withdraw Requests", async (ctx) => {
 
     let msg = `💸 **Pending Withdraw Requests (${pendingRequests.length})**\n\n`;
     pendingRequests.forEach((req, idx) => {
-        msg += `**${idx + 1}. Request ID:** `${req.id}`\n`;
-        msg += `👤 **User ID:** `${req.userId}`\n`;
-        msg += `💰 **Amount:** `৳${req.amount.toFixed(2)}` BDT\n`;
-        msg += `💳 **Account Info:** `${escapeHtml(req.binanceId)}`\n`;
-        msg += `📅 **Date:** ${req.date}\n\n`;
+        msg += `${idx + 1}. Request ID: ${req.id}\n`;
+        msg += `👤 User ID: ${req.userId}\n`;
+        msg += `💰 Amount: ৳${req.amount.toFixed(2)} BDT\n`;
+        msg += `💳 Account Info: ${escapeHtml(req.binanceId)}\n`;
+        msg += `📅 Date: ${req.date}\n\n`;
     });
 
     await ctx.reply(msg, { parse_mode: "HTML" }).catch(()=>{});
@@ -1047,7 +1047,7 @@ bot.callbackQuery(/^admin_/, async (ctx) => {
     if (!dbData.admins.includes(ctx.from.id)) return;
     const serviceName = ctx.callbackQuery.data.split("_")[1];
     adminState[ctx.from.id] = { service: serviceName, step: "input_country" };
-    await ctx.editMessageText(`📦 সার্ভিস সিলেক্ট করেছেন: **${escapeHtml(serviceName)}**\n\n🌍 এখন দেশের নাম টাইপ করে পাঠান:`, { parse_mode: "HTML" }).catch(()=>{});
+    await ctx.editMessageText(`📦 সার্ভিস সিলেক্ট করেছেন: ${escapeHtml(serviceName)}\n\n🌍 এখন দেশের নাম টাইপ করে পাঠান:`, { parse_mode: "HTML" }).catch(()=>{});
     ctx.answerCallbackQuery().catch(()=>{});
 });
 
@@ -1187,11 +1187,11 @@ bot.on(["message:text", "message:document"], async (ctx) => {
 
         delete userState[userId];
 
-        await ctx.reply(`✅ উইথড্র রিকোয়েস্ট সফলভাবে জমা হয়েছে!\n\n🆔 Request ID: ${reqId}\n💰 Amount: ৳${withdrawAmount.toFixed(2)} BDT\n💳 Account Info: `${escapeHtml(binanceId)}`\n\nঅ্যাডমিন শীঘ্রই এটি ভেরিফাই করে পেমেন্ট বানিয়ে দেবে।`, { parse_mode: "HTML", reply_markup: userReplyMenu.reply_markup }).catch(()=>{});
+        await ctx.reply(`✅ উইথড্র রিকোয়েস্ট সফলভাবে জমা হয়েছে!\n\n🆔 Request ID: ${reqId}\n💰 Amount: ৳${withdrawAmount.toFixed(2)} BDT\n💳 Account Info: ${escapeHtml(binanceId)}\n\nঅ্যাডমিন শীঘ্রই এটি ভেরিফাই করে পেমেন্ট বানিয়ে দেবে।`, { parse_mode: "HTML", reply_markup: userReplyMenu.reply_markup }).catch(()=>{});
 
         for (const adminId of dbData.admins) {
             try {
-                await bot.api.sendMessage(adminId, `🔔 **নতুন উইথড্র রিকোয়েস্ট এসেছে!**\n\n👤 User: ${userId}\n💰 Amount: ৳${withdrawAmount.toFixed(2)} BDT\n💳 Account Info: ${escapeHtml(binanceId)}`, { parse_mode: "HTML" });
+                await bot.api.sendMessage(adminId, `🔔 নতুন উইথড্র রিকোয়েস্ট এসেছে!\n\n👤 User: ${userId}\n💰 Amount: ৳${withdrawAmount.toFixed(2)} BDT\n💳 Account Info: ${escapeHtml(binanceId)}`, { parse_mode: "HTML" });
             } catch(e){}
         }
         return;
@@ -1206,7 +1206,7 @@ bot.on(["message:text", "message:document"], async (ctx) => {
         dbData.apiUrls.push(newUrl);
         writeDb(dbData);
         delete adminState[userId];
-        await ctx.reply(`✅ নতুন API URL যুক্ত করা হয়েছে:\n`${newUrl}``, { parse_mode: "HTML" }).catch(()=>{});
+        await ctx.reply(`✅ নতুন API URL যুক্ত করা হয়েছে: \n ${newUrl}`, { parse_mode: "HTML" }).catch(()=>{});
         return;
     }
 
@@ -1216,7 +1216,7 @@ bot.on(["message:text", "message:document"], async (ctx) => {
             dbData.checkDelay = delay;
             writeDb(dbData);
             delete adminState[userId];
-            await ctx.reply(`✅ OTP চেক করার ডিলে সেট করা হয়েছে: **${delay} ms**`, { parse_mode: "HTML" }).catch(()=>{});
+            await ctx.reply(`✅ OTP চেক করার ডিলে সেট করা হয়েছে: ${delay} ms`, { parse_mode: "HTML" }).catch(()=>{});
         } else {
             await ctx.reply("❌ সঠিক ইনপুট দিন (সর্বনিম্ন 1000 ms)।").catch(()=>{});
         }
