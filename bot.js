@@ -830,7 +830,7 @@ function startGlobalPanelListener() {
                                     const safeService = escapeHtml(serviceName.toUpperCase());
                                     const safeRawMsg = escapeHtml(rawMessage);
 
-                                    const globalMessage = `📢 **প্যানেল ওটিপি নোটিফিকেশন!** (Global Alert)\n📦 সার্ভিস: ${safeService}\n📞 নম্বর: `${maskedGlobalPhone}` \n\n💬 মেসেজ: *${safeRawMsg}*`;
+                                    const globalMessage = `📢 **প্যানেল ওটিপি নোটিফিকেশন!** (Global Alert)\n📦 সার্ভিস: ${safeService}\n📞 নম্বর: ${maskedGlobalPhone} \n\n💬 মেসেজ: *${safeRawMsg}*`;
                                     const botUsername = botInfo ? botInfo.username : "Bot";
                                     
                                     const inlineKeyboard = new InlineKeyboard()
