@@ -469,7 +469,7 @@ bot.hears("👤 Admin List", async (ctx) => {
 
     let adminText = `👤 **Admin List (${dbData.admins.length})**\n\n`;
     dbData.admins.forEach((adminId, index) => {
-        adminText += `${index + 1}. User ID: `${adminId}` ${adminId === MASTER_ADMIN ? "(Master Admin)" : ""}\n`;
+        adminText += `${index + 1}. User ID: ${adminId} ${adminId === MASTER_ADMIN ? "(Master Admin)" : ""}\n`;
     });
 
     await ctx.reply(adminText, { parse_mode: "HTML", reply_markup: adminControlMenu.reply_markup }).catch(()=>{});
@@ -491,10 +491,10 @@ bot.hears("📊 System Stats", async (ctx) => {
     const pendingWd = dbData.withdrawals.filter(w => w.status === "pending").length;
     
     let sysText = `🖥️ **System Overview Stats**\n\n`;
-    sysText += `👥 Registered Users: `${dbData.users.length}`\n`;
-    sysText += `👑 Total Admins: `${dbData.admins.length}`\n`;
-    sysText += `⏳ Pending Withdrawals: `${pendingWd}`\n`;
-    sysText += `⚡ Active Trackers: `${Object.keys(activeOtpCheckers).length}`\n`;
+    sysText += `👥 Registered Users: ${dbData.users.length}\n`;
+    sysText += `👑 Total Admins: ${dbData.admins.length}\n`;
+    sysText += `⏳ Pending Withdrawals: ${pendingWd}\n`;
+    sysText += `⚡ Active Trackers: ${Object.keys(activeOtpCheckers).length}\n`;
 
     await ctx.reply(sysText, { parse_mode: "HTML", reply_markup: adminControlMenu.reply_markup }).catch(()=>{});
 });
