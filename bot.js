@@ -302,11 +302,11 @@ bot.callbackQuery("adm_mod_msg", async (ctx) => {
 bot.callbackQuery("adm_view_config", async (ctx) => {
     const dbData = readDb();
     let text = `⚙️ **বর্তমান সিস্টেম কনফিগারেশন**\n\n`;
-    text += `⏱️ **Polling Delay:** `${dbData.checkDelay} ms`\n`;
-    text += `🔢 **Get Number Qty:** `${dbData.numberQty || 1}`\n\n`;
+    text += `⏱️ **Polling Delay:** ${dbData.checkDelay} ms\n`;
+    text += `🔢 **Get Number Qty:** ${dbData.numberQty || 1}\n\n`;
     text += `🔗 **API URLs (${dbData.apiUrls.length}):**\n`;
     dbData.apiUrls.forEach((url, i) => {
-        text += `${i + 1}. `${escapeHtml(url)}`\n`;
+        text += `${i + 1}. ${escapeHtml(url)}\n`;
     });
     text += `\n💬 **OTP Message Template:**\n*${escapeHtml(dbData.customOtpMsg)}*`;
 
