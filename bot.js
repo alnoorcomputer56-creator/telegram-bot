@@ -34,7 +34,7 @@ function escapeHtml(str) {
     return String(str)
         .replace(/&/g, "&")
         .replace(//g, ">")
-        .replace(/"/g, """);
+        .replace(/"/g, "");
 }
 
 // Complete list of all countries with dial code and 2-digit ISO code
