@@ -279,7 +279,7 @@ function readDb() {
             withdrawals: [],
             apiUrls: defaultApis,
             checkDelay: 4000,
-            customOtpMsg: "🚀 **FAST OTP RECEIVED!**\n\n📱 `{service}` | {flag} `{country}` | 📞 `+{phone}`\n\n💬 *\"{message}\"*\n\n👉 `{code}` *(Tap to Copy)*\n\n💰 **+৳{reward} BDT added to your balance!**"
+            customOtpMsg: "🚀 FAST OTP RECEIVED! \n\n📱 `{service}` | {flag} `{country}` | 📞 `+{phone}`\n\n💬 \"{message}\"*\n\n👉 `{code}` *(Tap to Copy)*\n\n💰 +৳{reward} BDT added to your balance!"
         }, null, 2));
     }
     try {
@@ -417,7 +417,7 @@ bot.callbackQuery(/^delapi_/, async (ctx) => {
     if (dbData.apiUrls[idx]) {
         const removed = dbData.apiUrls.splice(idx, 1);
         writeDb(dbData);
-        await ctx.editMessageText(`✅ API URL ডিলিট করা হয়েছে:\n`${removed[0]}``, { parse_mode: "HTML" }).catch(()=>{});
+        await ctx.editMessageText(`✅ API URL ডিলিট করা হয়েছে:\n ${removed[0]}`, { parse_mode: "HTML" }).catch(()=>{});
     }
     ctx.answerCallbackQuery().catch(()=>{});
 });
@@ -430,15 +430,15 @@ bot.callbackQuery("adm_set_delay", async (ctx) => {
 
 bot.callbackQuery("adm_mod_msg", async (ctx) => {
     adminState[ctx.from.id] = { step: "awaiting_otp_template" };
-    const helpMsg = `✏️ **কাস্টম ওটিপি মেসেজ টেমপ্লেট পরিবর্তন করুন**\n\n` +
+    const helpMsg = `✏️ কাস্টম ওটিপি মেসেজ টেমপ্লেট পরিবর্তন করুন \n\n` +
                     `ব্যবহারযোগ্য ট্যাগসমূহ:\n` +
-                    `• `{service}` - সার্ভিস নাম\n` +
-                    `• `{country}` - দেশের নাম\n` +
-                    `• `{flag}` - পতাকার ইমোজি\n` +
-                    `• `{phone}` - ফোন নম্বর\n` +
-                    `• `{message}` - ফুল মেসেজ\n` +
-                    `• `{code}` - ওটিপি কোড\n` +
-                    `• `{reward}` - প্রাপ্ত বিডিটি\n\n` +
+                    `• {service} - সার্ভিস নাম\n` +
+                    `• {country} - দেশের নাম\n` +
+                    `• {flag} - পতাকার ইমোজি\n` +
+                    `• {phone} - ফোন নম্বর\n` +
+                    `• {message} - ফুল মেসেজ\n` +
+                    `• {code} - ওটিপি কোড\n` +
+                    `• {reward} - প্রাপ্ত বিডিটি\n\n` +
                     `নতুন ফরম্যাট টাইপ করে লিখে পাঠান:`;
     await ctx.editMessageText(helpMsg, { parse_mode: "HTML" }).catch(()=>{});
     ctx.answerCallbackQuery().catch(()=>{});
@@ -446,13 +446,13 @@ bot.callbackQuery("adm_mod_msg", async (ctx) => {
 
 bot.callbackQuery("adm_view_config", async (ctx) => {
     const dbData = readDb();
-    let text = `⚙️ **বর্তমান সিস্টেম কনফিগারেশন**\n\n`;
-    text += `⏱️ **Polling Delay:** `${dbData.checkDelay} ms`\n\n`;
-    text += `🔗 **API URLs (${dbData.apiUrls.length}):**\n`;
+    let text = `⚙️ বর্তমান সিস্টেম কনফিগারেশন \n\n`;
+    text += `⏱️ Polling Delay: ${dbData.checkDelay} ms\n\n`;
+    text += `🔗 API URLs (${dbData.apiUrls.length}):\n`;
     dbData.apiUrls.forEach((url, i) => {
-        text += `${i + 1}. `${url}`\n`;
+        text += `${i + 1}. ${url} \n`;
     });
-    text += `\n💬 **OTP Message Template:**\n*${escapeHtml(dbData.customOtpMsg)}*`;
+    text += `\n💬 OTP Message Template: \n ${escapeHtml(dbData.customOtpMsg)}`;
 
     await ctx.editMessageText(text, { parse_mode: "HTML" }).catch(()=>{});
     ctx.answerCallbackQuery().catch(()=>{});
@@ -468,9 +468,9 @@ bot.hears("💰 Balance", async (ctx) => {
     const userId = ctx.from.id;
     const balance = (dbData.balances[userId] || 0).toFixed(2);
 
-    let text = `💵 **Your Current Balance**\n\n`;
-    text += `👤 User ID: `${userId}`\n`;
-    text += `💰 Balance: `৳${balance}` BDT\n\n`;
+    let text = `💵 Your Current Balance\n\n`;
+    text += `👤 User ID: ${userId}\n`;
+    text += `💰 Balance: ৳${balance} BDT\n\n`;
     text += `📌 Minimum withdrawal limit is **৳100.00 BDT**.`;
 
     await ctx.reply(text, { parse_mode: "HTML" }).catch(()=>{});
@@ -482,12 +482,12 @@ bot.hears("💳 Withdraw", async (ctx) => {
     const balance = dbData.balances[userId] || 0;
 
     if (balance < 100) {
-        await ctx.reply(`❌ **উইথড্র করতে ব্যর্থ!**\n\nআপনার বর্তমান ব্যালেন্স: `৳${balance.toFixed(2)}` BDT\nসর্বনিম্ন উইথড্র রিকোয়েস্ট পরিমাণ: `৳100.00` BDT`, { parse_mode: "HTML" }).catch(()=>{});
+        await ctx.reply(`❌ উইথড্র করতে ব্যর্থ! \n\nআপনার বর্তমান ব্যালেন্স: ৳${balance.toFixed(2)} BDT\nসর্বনিম্ন উইথড্র রিকোয়েস্ট পরিমাণ: ৳100.00 BDT`, { parse_mode: "HTML" }).catch(()=>{});
         return;
     }
 
     userState[userId] = { step: "awaiting_binance_id" };
-    await ctx.reply(`💳 **Withdrawal Request**\n\nআপনার বর্তমান ব্যালেন্স: `৳${balance.toFixed(2)}` BDT\n\nঅনুগ্রহ করে আপনার **Binance Pay ID / bKash / Nagad Number** টি লিখে পাঠান:`, { parse_mode: "HTML" }).catch(()=>{});
+    await ctx.reply(`💳 Withdrawal Request \n\nআপনার বর্তমান ব্যালেন্স: ৳${balance.toFixed(2)} BDT\n\nঅনুগ্রহ করে আপনার Binance Pay ID / bKash / Nagad Number টি লিখে পাঠান:`, { parse_mode: "HTML" }).catch(()=>{});
 });
 
 bot.hears("🚦 Live Traffic", async (ctx) => {
@@ -495,9 +495,9 @@ bot.hears("🚦 Live Traffic", async (ctx) => {
     const availableCount = dbData.numbers.filter(n => n.status === "available").length;
     const activeCheckersCount = Object.keys(activeOtpCheckers).length;
     
-    let infoText = `🚦 **Live Traffic Status**\n\n`;
-    infoText += `🟢 Available Numbers in Stock: `${availableCount}`\n`;
-    infoText += `⚡ Active OTP Requests Right Now: `${activeCheckersCount}`\n\n`;
+    let infoText = `🚦 Live Traffic Status \n\n`;
+    infoText += `🟢 Available Numbers in Stock: ${availableCount} \n`;
+    infoText += `⚡ Active OTP Requests Right Now: ${activeCheckersCount} \n\n`;
     infoText += `🚀 Bot is running smooth and ready to deliver numbers!`;
     
     await ctx.reply(infoText, { parse_mode: "HTML" }).catch(()=>{});
@@ -511,12 +511,12 @@ bot.hears("📊 Status", async (ctx) => {
     const totalUsers = dbData.users.length;
     const totalServices = dbData.services.length;
 
-    let statusText = `📊 **Bot Statistics Overview**\n\n`;
-    statusText += `👥 Total Users: `${totalUsers}`\n`;
-    statusText += `🛠️ Total Services Active: `${totalServices}`\n`;
-    statusText += `📱 Total Numbers in DB: `${totalNumbers}`\n`;
-    statusText += `🟩 Available Numbers: `${availableNumbers}`\n`;
-    statusText += `🟥 Used/Processing Numbers: `${usedNumbers}`\n`;
+    let statusText = `📊 Bot Statistics Overview \n\n`;
+    statusText += `👥 Total Users: ${totalUsers}\n`;
+    statusText += `🛠️ Total Services Active: ${totalServices}\n`;
+    statusText += `📱 Total Numbers in DB: ${totalNumbers}\n`;
+    statusText += `🟩 Available Numbers: ${availableNumbers}\n`;
+    statusText += `🟥 Used/Processing Numbers: ${usedNumbers}\n`;
 
     await ctx.reply(statusText, { parse_mode: "HTML" }).catch(()=>{});
 });
@@ -535,13 +535,13 @@ bot.hears("⚙️ Switch to Admin Menu", async (ctx) => {
 bot.hears("🛠️ Service Settings", async (ctx) => {
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    await ctx.reply("🛠️ **Service Settings Menu:**\nনিচের অপশনগুলো বেছে নিন:", { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(()=>{});
+    await ctx.reply("🛠️ Service Settings Menu: \nনিচের অপশনগুলো বেছে নিন:", { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(()=>{});
 });
 
 bot.hears("📢 Admin Control", async (ctx) => {
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    await ctx.reply("📢 **Admin Control Panel:**\nনিচের অপশনগুলো বেছে নিন:", { parse_mode: "HTML", reply_markup: adminControlMenu.reply_markup }).catch(()=>{});
+    await ctx.reply("📢 Admin Control Panel: \nনিচের অপশনগুলো বেছে নিন:", { parse_mode: "HTML", reply_markup: adminControlMenu.reply_markup }).catch(()=>{});
 });
 
 bot.hears("« Back to Main Menu", async (ctx) => {
@@ -561,7 +561,7 @@ bot.hears("📋 List Services", async (ctx) => {
     let text = `📋 **Active Services & Rates**\n\n`;
     dbData.services.forEach((s, idx) => {
         const rate = dbData.serviceRates[s] ? `৳${dbData.serviceRates[s].toFixed(2)} BDT` : "Default (৳5.00)";
-        text += `${idx + 1}. **${escapeHtml(s)}** - Rate: `${rate}`\n`;
+        text += `${idx + 1}. ${escapeHtml(s)} - Rate: ${rate}\n`;
     });
     
     await ctx.reply(text, { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(()=>{});
@@ -571,11 +571,11 @@ bot.hears("ℹ️ Help / Guide", async (ctx) => {
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
     
-    let helpText = `ℹ️ **Admin Help Guide**\n\n`;
-    helpText += `1️⃣ **Add Number:** নম্বর বাল্ক ফরম্যাটে বা টেক্সট ফাইলে আপলোড করুন।\n`;
-    helpText += `2️⃣ **Modify Rate:** সার্ভিস অথবা সার্ভিস+কান্ট্রি প্রতি ওটিপি রেট সেট করুন।\n`;
-    helpText += `3️⃣ **Withdraw Requests:** পেন্ডিং উইথড্র রিকোয়েস্ট চেক ও প্রসেস করুন।\n`;
-    helpText += `4️⃣ **/adminmenu:** Dynamic API, Delay এবং Custom Message ম্যানেজ করুন।\n`;
+    let helpText = `ℹ️ Admin Help Guide \n\n`;
+    helpText += `1️⃣ Add Number: নম্বর বাল্ক ফরম্যাটে বা টেক্সট ফাইলে আপলোড করুন।\n`;
+    helpText += `2️⃣ Modify Rate: সার্ভিস অথবা সার্ভিস+কান্ট্রি প্রতি ওটিপি রেট সেট করুন।\n`;
+    helpText += `3️⃣ Withdraw Requests: পেন্ডিং উইথড্র রিকোয়েস্ট চেক ও প্রসেস করুন।\n`;
+    helpText += `4️⃣ /adminmenu: Dynamic API, Delay এবং Custom Message ম্যানেজ করুন।\n`;
 
     await ctx.reply(helpText, { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(()=>{});
 });
@@ -584,9 +584,9 @@ bot.hears("👤 Admin List", async (ctx) => {
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
 
-    let adminText = `👤 **Admin List (${dbData.admins.length})**\n\n`;
+    let adminText = `👤 Admin List (${dbData.admins.length})\n\n`;
     dbData.admins.forEach((adminId, index) => {
-        adminText += `${index + 1}. User ID: `${adminId}` ${adminId === MASTER_ADMIN ? "(Master Admin)" : ""}\n`;
+        adminText += `${index + 1}. User ID: ${adminId} ${adminId === MASTER_ADMIN ? "(Master Admin)" : ""}\n`;
     });
 
     await ctx.reply(adminText, { parse_mode: "HTML", reply_markup: adminControlMenu.reply_markup }).catch(()=>{});
@@ -607,11 +607,11 @@ bot.hears("📊 System Stats", async (ctx) => {
     
     const pendingWd = dbData.withdrawals.filter(w => w.status === "pending").length;
     
-    let sysText = `🖥️ **System Overview Stats**\n\n`;
-    sysText += `👥 Registered Users: `${dbData.users.length}`\n`;
-    sysText += `👑 Total Admins: `${dbData.admins.length}`\n`;
-    sysText += `⏳ Pending Withdrawals: `${pendingWd}`\n`;
-    sysText += `⚡ Active Trackers: `${Object.keys(activeOtpCheckers).length}`\n`;
+    let sysText = `🖥️ System Overview Stats\n\n`;
+    sysText += `👥 Registered Users: ${dbData.users.length}\n`;
+    sysText += `👑 Total Admins: ${dbData.admins.length}\n`;
+    sysText += `⏳ Pending Withdrawals: ${pendingWd}\n`;
+    sysText += `⚡ Active Trackers: ${Object.keys(activeOtpCheckers).length}\n`;
 
     await ctx.reply(sysText, { parse_mode: "HTML", reply_markup: adminControlMenu.reply_markup }).catch(()=>{});
 });
@@ -697,8 +697,8 @@ async function deliverNumbers(ctx, service, country, previousId = null) {
     
     const countryFlag = getCountryFlag(availableNumber.country);
     
-    let text = `${countryFlag} **Country:** ${escapeHtml(availableNumber.country)}\n`;
-    text += `🛠️ **Service:** ${escapeHtml(service)}\n\n`;
+    let text = `${countryFlag} Country: ${escapeHtml(availableNumber.country)}\n`;
+    text += `🛠️ Service: ${escapeHtml(service)}\n\n`;
     text += `⏳ Waiting for OTP...`;
 
     const actionKeyboard = new InlineKeyboard()
@@ -751,8 +751,8 @@ bot.callbackQuery(/^togglepref_/, async (ctx) => {
 
     const countryFlag = getCountryFlag(numObj.country);
 
-    let text = `${countryFlag} **Country:** ${escapeHtml(numObj.country)}\n`;
-    text += `🛠️ **Service:** ${escapeHtml(service)}\n\n`;
+    let text = `${countryFlag} Country: ${escapeHtml(numObj.country)}\n`;
+    text += `🛠️ Service: ${escapeHtml(service)}\n\n`;
     text += `⏳ Waiting for OTP...`;
 
     const actionKeyboard = new InlineKeyboard()
@@ -853,7 +853,7 @@ function startLiveOtpCheck(numberId, phoneNumber, serviceName, fallbackUserId, c
                                         const safeCountryName = escapeHtml(countryName);
                                         const flag = getCountryFlag(countryName);
 
-                                        let userSuccessMessage = dbData.customOtpMsg || "🚀 **FAST OTP RECEIVED!**\n\n📱 `{service}` | {flag} `{country}` | 📞 `+{phone}`\n\n💬 *\"{message}\"*\n\n👉 `{code}` *(Tap to Copy)*\n\n💰 **+৳{reward} BDT added to your balance!**";
+                                        let userSuccessMessage = dbData.customOtpMsg || "🚀 FAST OTP RECEIVED!\n\n📱 `{service}` | {flag} `{country}` | 📞 `+{phone}`\n\n💬 *\"{message}\"*\n\n👉 `{code}` *(Tap to Copy)*\n\n💰 **+৳{reward} BDT added to your balance!**";
                                         
                                         userSuccessMessage = userSuccessMessage
                                             .replace(/{service}/g, detectedService)
@@ -928,7 +928,7 @@ function startGlobalPanelListener() {
                                     const safeService = escapeHtml(serviceName.toUpperCase());
                                     const safeRawMsg = escapeHtml(rawMessage);
 
-                                    const globalMessage = `📢 **প্যানেল ওটিপি নোটিফিকেশন!** (Global Alert)\n📦 সার্ভিস: ${safeService}\n📞 নম্বর: `${maskedGlobalPhone}`\n\n💬 মেসেজ: *${safeRawMsg}*`;
+                                    const globalMessage = `📢 প্যানেল ওটিপি নোটিফিকেশন! (Global Alert)\n📦 সার্ভিস: ${safeService}\n📞 নম্বর: ${maskedGlobalPhone}\n\n💬 মেসেজ: ${safeRawMsg}`;
                                     
                                     const botUsername = botInfo ? botInfo.username : "Bot";
                                     
@@ -999,7 +999,7 @@ bot.callbackQuery(/^delservice_/, async (ctx) => {
     dbData.numbers = dbData.numbers.filter(n => n.service !== serviceName);
     writeDb(dbData);
 
-    await ctx.editMessageText(`✅ **${escapeHtml(serviceName)}** সার্ভিস এবং এর সব নম্বর ডেটাবেজ থেকে মুছে ফেলা হয়েছে!`, { parse_mode: "HTML" }).catch(()=>{});
+    await ctx.editMessageText(`✅ ${escapeHtml(serviceName)} সার্ভিস এবং এর সব নম্বর ডেটাবেজ থেকে মুছে ফেলা হয়েছে!`, { parse_mode: "HTML" }).catch(()=>{});
     ctx.answerCallbackQuery().catch(()=>{});
 });
 
@@ -1187,11 +1187,11 @@ bot.on(["message:text", "message:document"], async (ctx) => {
 
         delete userState[userId];
 
-        await ctx.reply(`✅ **উইথড্র রিকোয়েস্ট সফলভাবে জমা হয়েছে!**\n\n🆔 Request ID: `${reqId}`\n💰 Amount: `৳${withdrawAmount.toFixed(2)}` BDT\n💳 Account Info: `${escapeHtml(binanceId)}`\n\nঅ্যাডমিন শীঘ্রই এটি ভেরিফাই করে পেমেন্ট বানিয়ে দেবে।`, { parse_mode: "HTML", reply_markup: userReplyMenu.reply_markup }).catch(()=>{});
+        await ctx.reply(`✅ উইথড্র রিকোয়েস্ট সফলভাবে জমা হয়েছে!\n\n🆔 Request ID: ${reqId}\n💰 Amount: ৳${withdrawAmount.toFixed(2)} BDT\n💳 Account Info: `${escapeHtml(binanceId)}`\n\nঅ্যাডমিন শীঘ্রই এটি ভেরিফাই করে পেমেন্ট বানিয়ে দেবে।`, { parse_mode: "HTML", reply_markup: userReplyMenu.reply_markup }).catch(()=>{});
 
         for (const adminId of dbData.admins) {
             try {
-                await bot.api.sendMessage(adminId, `🔔 **নতুন উইথড্র রিকোয়েস্ট এসেছে!**\n\n👤 User: `${userId}`\n💰 Amount: `৳${withdrawAmount.toFixed(2)}` BDT\n💳 Account Info: `${escapeHtml(binanceId)}``, { parse_mode: "HTML" });
+                await bot.api.sendMessage(adminId, `🔔 **নতুন উইথড্র রিকোয়েস্ট এসেছে!**\n\n👤 User: ${userId}\n💰 Amount: ৳${withdrawAmount.toFixed(2)} BDT\n💳 Account Info: ${escapeHtml(binanceId)}`, { parse_mode: "HTML" });
             } catch(e){}
         }
         return;
@@ -1242,7 +1242,7 @@ bot.on(["message:text", "message:document"], async (ctx) => {
         if (!isNaN(rate) && rate > 0) {
             dbData.serviceRates[state.service] = rate;
             writeDb(dbData);
-            await ctx.reply(`✅ **${escapeHtml(state.service)}** সার্ভিসের নতুন OTP Rate set করা হয়েছে: **৳${rate.toFixed(2)} BDT**`, { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(()=>{});
+            await ctx.reply(`✅ ${escapeHtml(state.service)} সার্ভিসের নতুন OTP Rate set করা হয়েছে: ৳${rate.toFixed(2)} BDT`, { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(()=>{});
         } else {
             await ctx.reply("❌ রেট টি সঠিকভাবে লিখুন (যেমন: 5.50)।").catch(()=>{});
         }
@@ -1270,7 +1270,7 @@ bot.on(["message:text", "message:document"], async (ctx) => {
     else if (state.step === "input_country" && ctx.message.text) {
         state.country = ctx.message.text.trim();
         state.step = "input_rate";
-        await ctx.reply(`💵 **\({escapeHtml(state.service)} (\){escapeHtml(state.country)})** এর জন্য প্রতি OTP তে কত BDT দিতে চান? (যেমন: 5.5 বা 10):`, { parse_mode: "HTML" }).catch(()=>{});
+        await ctx.reply(`💵 \({escapeHtml(state.service)} (\){escapeHtml(state.country)}) এর জন্য প্রতি OTP তে কত BDT দিতে চান? (যেমন: 5.5 বা 10):`, { parse_mode: "HTML" }).catch(()=>{});
     }
     else if (state.step === "input_rate" && ctx.message.text) {
         const rate = parseFloat(ctx.message.text.trim());
@@ -1284,7 +1284,7 @@ bot.on(["message:text", "message:document"], async (ctx) => {
         writeDb(dbData);
 
         state.step = "input_numbers";
-        await ctx.reply(`✅ Per OTP Rate: **৳${rate.toFixed(2)} BDT** সেভ করা হয়েছে!\n\n🔢 এখন নম্বরগুলো পেস্ট করুন বা ফাইল দিন:`, { parse_mode: "HTML" }).catch(()=>{});
+        await ctx.reply(`✅ Per OTP Rate: ৳${rate.toFixed(2)} BDT সেভ করা হয়েছে!\n\n🔢 এখন নম্বরগুলো পেস্ট করুন বা ফাইল দিন:`, { parse_mode: "HTML" }).catch(()=>{});
     }
     else if (state.step === "input_numbers") {
         let textData = ctx.message.text || "";
