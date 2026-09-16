@@ -287,13 +287,13 @@ bot.callbackQuery("adm_mod_msg", async (ctx) => {
     adminState[ctx.from.id] = { step: "awaiting_otp_template" };
     const helpMsg = `✏️ **কাস্টম ওটিপি মেসেজ টেমপ্লেট পরিবর্তন করুন**\n\n` +
                     `ব্যবহারযোগ্য ট্যাগসমূহ:\n` +
-                    `• `{service}` - সার্ভিস নাম\n` +
-                    `• `{country}` - দেশের নাম\n` +
-                    `• `{flag}` - পতাকার ইমোজি\n` +
-                    `• `{phone}` - ফোন নম্বর\n` +
-                    `• `{message}` - ফুল মেসেজ\n` +
-                    `• `{code}` - ওটিপি কোড\n` +
-                    `• `{reward}` - প্রাপ্ত বিডিটি\n\n` +
+                    `• {service} - সার্ভিস নাম\n` +
+                    `• {country} - দেশের নাম\n` +
+                    `• {flag} - পতাকার ইমোজি\n` +
+                    `• {phone} - ফোন নম্বর\n` +
+                    `• {message} - ফুল মেসেজ\n` +
+                    `• {code} - ওটিপি কোড\n` +
+                    `• {reward} - প্রাপ্ত বিডিটি\n\n` +
                     `নতুন ফরম্যাট টাইপ করে লিখে পাঠান:`;
     await ctx.editMessageText(helpMsg, { parse_mode: "HTML" }).catch(()=>{});
     ctx.answerCallbackQuery().catch(()=>{});
