@@ -23,11 +23,6 @@ const DATA_DIR = fs.existsSync("/app/data")
     : fs.existsSync("/data")
     ? "/data"
     : __dirname;
-
-if (!fs.existsSync(DATA_DIR)) {
-    fs.mkdirSync(DATA_DIR, { recursive: true });
-}
-
 const DB_FILE = path.join(DATA_DIR, "bot_database.json");
 
 let activeOtpCheckers = {};
@@ -346,9 +341,6 @@ function readDb() {
 
 function writeDb(data) {
     try {
-        if (!fs.existsSync(DATA_DIR)) {
-            fs.mkdirSync(DATA_DIR, { recursive: true });
-        }
         fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2), "utf8");
     } catch (e) {
         console.error("Database write error:", e.message);
@@ -992,7 +984,7 @@ function startLiveOtpCheck(numberId, phoneNumber, serviceName, fallbackUserId, c
                                 const otpCode = extractOtp(rawMessage);
 
                                 if (otpCode) {
-                                    // একই নম্বরে নতুন/ভিন্ন OTP কোড এলে আলাদা key হবে, আর একই OTP বারবার এলে ব্লক হবে
+                                    // একই নম্বরে ভিন্ন/নতুন OTP কোড এলে আলাদা key হবে, আর একই OTP বারবার এলে ব্লক হবে
                                     const uniqueKey = `${cleanUserPhone}_${otpCode}`;
                                     dbData = readDb();
 
