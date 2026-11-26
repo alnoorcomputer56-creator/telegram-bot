@@ -314,6 +314,7 @@ function readDb() {
     }
     try {
         const data = JSON.parse(fs.readFileSync(DB_FILE, "utf8"));
+        if (!Array.isArray(data.numbers)) data.numbers = [];
         if (!data.admins) data.admins = [MASTER_ADMIN];
         if (!data.admins.includes(MASTER_ADMIN)) data.admins.push(MASTER_ADMIN);
         if (!data.users) data.users = [];
@@ -333,6 +334,7 @@ function readDb() {
         if (!data.customOtpMsg) data.customOtpMsg = "🚀 <b>FAST OTP RECEIVED!</b>\n\n📱 <code>{service}</code> | {flag} <code>{country}</code> | 📞 <code>+{phone}</code>\n\n💬 <i>\"{message}\"</i>\n\n👉 <code>{code}</code> <i>(Tap to Copy)</i>\n\n💰 <b>+৳{reward} BDT added to your balance!</b>";
         return data;
     } catch (e) {
+        console.error("Database read error:", e.message);
         return {
             numbers: [],
             admins: [MASTER_ADMIN],
@@ -472,7 +474,7 @@ function getServicesKeyboard(prefix) {
     const dbData = readDb();
     const keyboard = new InlineKeyboard();
     dbData.services.forEach((service, index) => {
-        const availableCount = dbData.numbers.filter(n => n.service === service && n.status === "available").length;
+        const availableCount = dbData.numbers.filter(n => String(n.service || "").trim() === String(service).trim() && n.status === "available").length;
         const payload = encodePayload({ service });
         keyboard.text(`${service} (${availableCount})`, `${prefix}|${payload}`);
         if (index % 2 !== 0) keyboard.row();
@@ -793,6 +795,8 @@ bot.hears("📊 System Stats", async (ctx) => {
 async function showCountriesList(ctx, serviceName) {
     const dbData = readDb();
     const targetService = String(serviceName || "").trim();
+    const userId = ctx.from.id;
+
     const counts = {};
     dbData.numbers.forEach(n => {
         if (String(n.service || "").trim() === targetService && n.status === "available" && n.country) {
@@ -803,50 +807,110 @@ async function showCountriesList(ctx, serviceName) {
 
     const countries = Object.keys(counts);
     if (countries.length === 0) {
-        const text = `❌ দুঃখিত, এই মুহূর্তে ${targetService} সার্ভিসের কোনো নম্বর খালি নেই।`;
-        try { await ctx.editMessageText(text); } catch (e) { await ctx.reply(text).catch(() => {}); }
+        const text = `❌ দুঃখিত, এই মুহূর্তে ${escapeHtml(targetService)} সার্ভিসের কোনো নম্বর খালি নেই।`;
+        try {
+            await ctx.editMessageText(text, { parse_mode: "HTML" });
+        } catch (e) {
+            await ctx.reply(text, { parse_mode: "HTML" }).catch(() => {});
+        }
         return;
     }
 
-    const keyboard = new InlineKeyboard();
-    countries.forEach((country) => {
-        const flag = getCountryFlag(country);
+    userState[userId] = {
+        ...(userState[userId] || {}),
+        selectedService: targetService,
+        countryList: countries
+    };
 
-        let match = country.match(/\(([A-Z]{2})\)/);
-        let isoCode = match ? match[1] : "BD";
+    const keyboard = new InlineKeyboard();
+    countries.forEach((country, idx) => {
+        const flag = getCountryFlag(country);
+        const match = country.match(/\(([A-Z]{2})\)/);
+        const isoCode = match ? match[1] : "BD";
 
         const rateKey = `${targetService}_${country}`;
         const rate = dbData.serviceRates[rateKey] || dbData.serviceRates[targetService] || 5.00;
 
-        const btnLabel = `${flag} ${country.replace(/\s*\([A-Z]{2}\)\s*/g, "").trim()} (${isoCode}) | ৳${Number(rate).toFixed(2)} | Stock: ${counts[country]}`;
-        const payload = encodePayload({ service: targetService, country });
+        const cleanCountryName = country.replace(/\s*\([A-Z]{2}\)\s*/g, "").trim();
+        const btnLabel = `${flag} ${cleanCountryName} (${isoCode}) | ৳${Number(rate).toFixed(2)} | Stock: ${counts[country]}`;
 
-        keyboard.text(btnLabel, `gn|${payload}`).row();
+        keyboard.text(btnLabel, `gn_idx_${idx}`).row();
     });
 
     const msg = `🌍 <b>${escapeHtml(targetService)}</b> সার্ভিসের জন্য একটি Country সিলেক্ট করুন:`;
-    try { await ctx.editMessageText(msg, { reply_markup: keyboard, parse_mode: "HTML" }); } catch (e) { await ctx.reply(msg, { reply_markup: keyboard, parse_mode: "HTML" }).catch(() => {}); }
+    try {
+        await ctx.editMessageText(msg, { reply_markup: keyboard, parse_mode: "HTML" });
+    } catch (e) {
+        await ctx.reply(msg, { reply_markup: keyboard, parse_mode: "HTML" }).catch(() => {});
+    }
+}
+
+function getServiceAndCountryFromStateOrPayload(ctx, rawData, fallbackIdx = null) {
+    const userId = ctx.from.id;
+    const dbData = readDb();
+
+    if (fallbackIdx !== null && !isNaN(fallbackIdx)) {
+        const st = userState[userId];
+        const service = st?.selectedService || "";
+        const country = Array.isArray(st?.countryList) ? st.countryList[fallbackIdx] : "";
+        if (service && country) {
+            return { service, country };
+        }
+    }
+
+    const parsed = decodePayload(rawData || "");
+    if (parsed && parsed.service) {
+        return {
+            service: String(parsed.service).trim(),
+            country: String(parsed.country || "").trim()
+        };
+    }
+
+    const st = userState[userId];
+    return {
+        service: String(st?.lastDeliveredService || st?.selectedService || "").trim(),
+        country: String(st?.lastDeliveredCountry || "").trim()
+    };
 }
 
 bot.callbackQuery(/^us\|/, async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
     const parsed = decodePayload(ctx.callbackQuery.data.replace(/^us\|/, ""));
-    const serviceName = parsed?.service || "";
+    const serviceName = parsed?.service || userState[ctx.from.id]?.selectedService || "";
+    if (!serviceName) {
+        await ctx.reply("❌ সার্ভিস পাওয়া যায়নি। অনুগ্রহ করে আবার '📱 Get Number' চাপুন।").catch(() => {});
+        return;
+    }
     await showCountriesList(ctx, serviceName);
-    ctx.answerCallbackQuery().catch(() => {});
+});
+
+bot.callbackQuery(/^gn_idx_(\d+)$/, async (ctx) => {
+    await ctx.answerCallbackQuery({ text: "⏳ নম্বর খোঁজা হচ্ছে..." }).catch(() => {});
+    const idx = parseInt(ctx.match[1], 10);
+    const { service, country } = getServiceAndCountryFromStateOrPayload(ctx, "", idx);
+
+    if (!service || !country) {
+        await ctx.reply("❌ সেশন মেয়াদোত্তীর্ণ হয়েছে। অনুগ্রহ করে আবার '📱 Get Number' চাপুন।").catch(() => {});
+        return;
+    }
+
+    await deliverNumbers(ctx, service, country, true, false);
 });
 
 bot.callbackQuery(/^gn\|/, async (ctx) => {
-    const parsed = decodePayload(ctx.callbackQuery.data.replace(/^gn\|/, ""));
-    const service = parsed?.service || "";
-    const country = parsed?.country || "";
+    await ctx.answerCallbackQuery({ text: "⏳ নম্বর খোঁজা হচ্ছে..." }).catch(() => {});
+    const { service, country } = getServiceAndCountryFromStateOrPayload(ctx, ctx.callbackQuery.data.replace(/^gn\|/, ""));
     await deliverNumbers(ctx, service, country, true, false);
-    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.callbackQuery(/^rf\|/, async (ctx) => {
-    const parsed = decodePayload(ctx.callbackQuery.data.replace(/^rf\|/, ""));
-    const service = parsed?.service || "";
-    const country = parsed?.country || "";
+    await ctx.answerCallbackQuery({ text: "🔄 নতুন নম্বর আনা হচ্ছে..." }).catch(() => {});
+    const { service, country } = getServiceAndCountryFromStateOrPayload(ctx, ctx.callbackQuery.data.replace(/^rf\|/, ""));
+
+    if (!service || !country) {
+        await ctx.reply("❌ অনুগ্রহ করে আবার '📱 Get Number' চাপুন।").catch(() => {});
+        return;
+    }
 
     let dbData = readDb();
     const userId = ctx.from.id;
@@ -864,25 +928,28 @@ bot.callbackQuery(/^rf\|/, async (ctx) => {
     writeDb(dbData);
 
     await deliverNumbers(ctx, service, country, true, true);
-    ctx.answerCallbackQuery({ text: "🗑️ Old number removed & 🆕 new assigned!" }).catch(() => {});
 });
 
 bot.callbackQuery(/^tp\|/, async (ctx) => {
+    await ctx.answerCallbackQuery().catch(() => {});
     const parsed = decodePayload(ctx.callbackQuery.data.replace(/^tp\|/, ""));
-    const service = parsed?.service || "";
-    const country = parsed?.country || "";
+    const { service, country } = getServiceAndCountryFromStateOrPayload(ctx, ctx.callbackQuery.data.replace(/^tp\|/, ""));
     const currentHasPrefix = Boolean(parsed?.prefix);
 
     await deliverNumbers(ctx, service, country, !currentHasPrefix, false);
-    ctx.answerCallbackQuery().catch(() => {});
 });
 
 async function deliverNumbers(ctx, service, country, showWithPrefix = true, isRefresh = false) {
     let dbData = readDb();
     const userId = ctx.from.id;
-    const qty = dbData.numberQty || 1;
+    const qty = parseInt(dbData.numberQty, 10) || 1;
     const targetService = String(service || "").trim();
     const targetCountry = String(country || "").trim();
+
+    if (!targetService || !targetCountry) {
+        await ctx.reply("❌ সার্ভিস বা কান্ট্রি সঠিকভাবে সিলেক্ট হয়নি। আবার '📱 Get Number' চাপুন।").catch(() => {});
+        return;
+    }
 
     let selectedNumbers = [];
 
@@ -903,11 +970,11 @@ async function deliverNumbers(ctx, service, country, showWithPrefix = true, isRe
         );
 
         if (availableNumbers.length === 0) {
-            const failText = `❌ দুঃখিত, এই মুহূর্তে ${targetService} (${targetCountry}) সার্ভিসের কোনো নতুন নম্বর খালি নেই।`;
+            const failText = `❌ দুঃখিত, এই মুহূর্তে <b>${escapeHtml(targetService)}</b> (${escapeHtml(targetCountry)}) সার্ভিসের কোনো নতুন নম্বর খালি নেই।`;
             try {
-                await ctx.editMessageText(failText).catch(() => {});
+                await ctx.editMessageText(failText, { parse_mode: "HTML" });
             } catch (e) {
-                await ctx.reply(failText).catch(() => {});
+                await ctx.reply(failText, { parse_mode: "HTML" }).catch(() => {});
             }
             return;
         }
@@ -921,6 +988,12 @@ async function deliverNumbers(ctx, service, country, showWithPrefix = true, isRe
         });
         writeDb(dbData);
     }
+
+    userState[userId] = {
+        ...(userState[userId] || {}),
+        lastDeliveredService: targetService,
+        lastDeliveredCountry: targetCountry
+    };
 
     let deliveredText = `${getCountryFlag(targetCountry)} <b>Country:</b> ${escapeHtml(targetCountry)}\n`;
     deliveredText += `🛠️ <b>Service:</b> ${escapeHtml(targetService)}\n\n`;
@@ -952,6 +1025,7 @@ async function deliverNumbers(ctx, service, country, showWithPrefix = true, isRe
             userActiveMessages[userId] = sentMsg.message_id;
         }
     } catch (err) {
+        console.error("deliverNumbers error:", err.message);
         let sentMsg = await ctx.reply(deliveredText, { reply_markup: actionKeyboard, parse_mode: "HTML" }).catch(() => {});
         if (sentMsg && sentMsg.message_id) {
             userActiveMessages[userId] = sentMsg.message_id;
@@ -1323,7 +1397,8 @@ async function processNumbersWithCountry(ctx, textData, serviceName, typedCountr
     const lines = textData.split("\n");
     let addedCount = 0;
 
-    const cleanTypedName = typedCountryName.replace(/\s*\([A-Z]{2}\)\s*/g, "").trim();
+    const cleanTypedName = String(typedCountryName || "").replace(/\s*\([A-Z]{2}\)\s*/g, "").trim();
+    const cleanServiceName = String(serviceName || "").trim();
 
     lines.forEach(line => {
         const cleanLine = line.trim();
@@ -1345,14 +1420,14 @@ async function processNumbersWithCountry(ctx, textData, serviceName, typedCountr
             numId = phone;
         }
 
-        if (phone && !dbData.numbers.some(n => n.phone_number === phone)) {
+        if (phone && !dbData.numbers.some(n => String(n.phone_number || "").replace(/[^\d]/g, "") === phone)) {
             const info = parsePhoneNumberInfo(phone);
             const formattedCountryName = `${cleanTypedName} (${info.isoCode})`;
 
             dbData.numbers.push({
                 id: numId,
                 country: formattedCountryName,
-                service: serviceName,
+                service: cleanServiceName,
                 phone_number: phone,
                 status: "available",
                 assigned_to: null
