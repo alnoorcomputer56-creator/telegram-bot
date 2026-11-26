@@ -25,6 +25,7 @@ let botInfo = null;
 let adminState = {}; 
 let userState = {};
 let userActiveMessages = {}; 
+let ivasmsRateLimitUntil = 0;
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -279,6 +280,7 @@ function readDb() {
             sentOtps: [], 
             apiUrls: defaultApis,
             ivasmsApiUrls: [],
+            ivasmsApiKey: "",
             checkDelay: 4000,
             numberQty: 1, 
             customOtpMsg: "🚀 <b>FAST OTP RECEIVED!</b>\n\n📱 <code>{service}</code> | {flag} <code>{country}</code> | 📞 <code>+{phone}</code>\n\n💬 <i>\"{message}\"</i>\n\n👉 <code>{code}</code> <i>(Tap to Copy)</i>\n\n💰 <b>+৳{reward} BDT added to your balance!</b>"
@@ -299,12 +301,13 @@ function readDb() {
             "http://169.58.213.56/crapi/ALEIUS/viewstats?token=dsglfRknOC2y_94AAD164B4ED"
         ];
         if (!Array.isArray(data.ivasmsApiUrls)) data.ivasmsApiUrls = [];
+        if (typeof data.ivasmsApiKey !== "string") data.ivasmsApiKey = "";
         if (!data.checkDelay) data.checkDelay = 4000;
         if (!data.numberQty) data.numberQty = 1;
         if (!data.customOtpMsg) data.customOtpMsg = "🚀 <b>FAST OTP RECEIVED!</b>\n\n📱 <code>{service}</code> | {flag} <code>{country}</code> | 📞 <code>+{phone}</code>\n\n💬 <i>\"{message}\"</i>\n\n👉 <code>{code}</code> <i>(Tap to Copy)</i>\n\n💰 <b>+৳{reward} BDT added to your balance!</b>";
         return data;
     } catch (e) {
-        return { numbers: [], admins: [MASTER_ADMIN], users: [], services: ["Telegram", "WhatsApp", "Imo", "Instagram", "Facebook", "TikTok", "Uber"], serviceRates: {}, balances: {}, withdrawals: [], sentOtps: [], apiUrls: ["https://panel.lamix.org/api/v1/messages?token=F03xiioltLwvYbIlS470UQ9XuVWkp-KlqC5f_r2yXhs"], ivasmsApiUrls: [], checkDelay: 4000, numberQty: 1, customOtpMsg: "🚀 <b>FAST OTP RECEIVED!</b>\n\n📱 <code>{service}</code> | {flag} <code>{country}</code> | 📞 <code>+{phone}</code>\n\n💬 <i>\"{message}\"</i>\n\n👉 <code>{code}</code> <i>(Tap to Copy)</i>\n\n💰 <b>+৳{reward} BDT added to your balance!</b>" };
+        return { numbers: [], admins: [MASTER_ADMIN], users: [], services: ["Telegram", "WhatsApp", "Imo", "Instagram", "Facebook", "TikTok", "Uber"], serviceRates: {}, balances: {}, withdrawals: [], sentOtps: [], apiUrls: ["https://panel.lamix.org/api/v1/messages?token=F03xiioltLwvYbIlS470UQ9XuVWkp-KlqC5f_r2yXhs"], ivasmsApiUrls: [], ivasmsApiKey: "", checkDelay: 4000, numberQty: 1, customOtpMsg: "🚀 <b>FAST OTP RECEIVED!</b>\n\n📱 <code>{service}</code> | {flag} <code>{country}</code> | 📞 <code>+{phone}</code>\n\n💬 <i>\"{message}\"</i>\n\n👉 <code>{code}</code> <i>(Tap to Copy)</i>\n\n💰 <b>+৳{reward} BDT added to your balance!</b>" };
     }
 }
 
@@ -314,6 +317,32 @@ function writeDb(data) {
     } catch(e) {
         console.error("Database write error:", e);
     }
+}
+
+async function fetchJsonFromUrl(rawUrl, apiKey = "") {
+    const separator = rawUrl.includes("?") ? "&" : "?";
+    const targetUrl = `${rawUrl}${separator}_cb=${Date.now()}`;
+    const headers = { "Accept": "application/json" };
+    if (apiKey && apiKey.trim()) {
+        headers["Authorization"] = `Bearer ${apiKey.trim()}`;
+    }
+
+    const response = await fetch(targetUrl, { method: "GET", headers });
+    if (response.status === 429) {
+        const body = await response.json().catch(() => ({}));
+        const retrySec = parseInt(response.headers.get("retry-after") || body?.error?.retry_after || body?.retry_after || "60", 10) || 60;
+        ivasmsRateLimitUntil = Date.now() + retrySec * 1000;
+        return [];
+    }
+    if (!response.ok) return [];
+    const json = await response.json();
+    const list = (json && (json.records || json.data)) ? (json.records || json.data) : [];
+    if (!Array.isArray(list)) return [];
+    return list.map(item => ({
+        number: item.number || item.num || item.phone || "",
+        message: item.content || item.message || item.text || "",
+        cli: item.source || item.cli || item.service || "Global"
+    }));
 }
 
 // --- Keyboards ---
@@ -397,8 +426,8 @@ bot.command("adminmenu", async (ctx) => {
     const keyboard = new InlineKeyboard()
         .text("➕ Add API URL", "adm_add_api").text("❌ Delete API URL", "adm_del_api").row()
         .text("➕ Add iVASMS API", "adm_add_ivasms_api").text("❌ Del iVASMS API", "adm_del_ivasms_api").row()
-        .text("⏱️ Set Delay", "adm_set_delay").text("✏️ Modify OTP Msg", "adm_mod_msg").row()
-        .text(`🔢 Get Number Quantity (${dbData.numberQty || 1})`, "adm_set_number_qty").row()
+        .text("🔑 iVASMS Bearer Key", "adm_set_ivasms_key").text("⏱️ Set Delay", "adm_set_delay").row()
+        .text("✏️ Modify OTP Msg", "adm_mod_msg").text(`🔢 Get Number Quantity (${dbData.numberQty || 1})`, "adm_set_number_qty").row()
         .text("📋 View Settings", "adm_view_config");
 
     await ctx.reply("🔑 <b>Admin System Settings Panel</b>\n\nনিচের অপশনগুলো থেকে কনফিগার করুন:", {
@@ -409,7 +438,7 @@ bot.command("adminmenu", async (ctx) => {
 
 bot.callbackQuery("adm_add_ivasms_api", async (ctx) => {
     adminState[ctx.from.id] = { step: "awaiting_ivasms_api_url" };
-    await ctx.editMessageText("➕ নতুন iVASMS API লিঙ্ক লিখে পাঠান:").catch(()=>{});
+    await ctx.editMessageText("➕ iVASMS API লিঙ্ক লিখে পাঠান\n(যেমন: <code>https://www.ivasms.com/api/v1/messages?per_page=200</code>):", { parse_mode: "HTML" }).catch(()=>{});
     ctx.answerCallbackQuery().catch(()=>{});
 });
 
@@ -431,6 +460,12 @@ bot.callbackQuery(/^delivasmsapi_/, async (ctx) => {
         writeDb(dbData);
         await ctx.editMessageText(`✅ iVASMS API লিঙ্ক ডিলিট করা হয়েছে:\n<code>${escapeHtml(removed[0])}</code>`, { parse_mode: "HTML" }).catch(()=>{});
     }
+    ctx.answerCallbackQuery().catch(()=>{});
+});
+
+bot.callbackQuery("adm_set_ivasms_key", async (ctx) => {
+    adminState[ctx.from.id] = { step: "awaiting_ivasms_key" };
+    await ctx.editMessageText("🔑 iVASMS Bearer API Key পাঠান (যেমন: <code>sk_live_...</code>):", { parse_mode: "HTML" }).catch(()=>{});
     ctx.answerCallbackQuery().catch(()=>{});
 });
 
@@ -491,9 +526,11 @@ bot.callbackQuery("adm_mod_msg", async (ctx) => {
 
 bot.callbackQuery("adm_view_config", async (ctx) => {
     const dbData = readDb();
+    const maskedKey = dbData.ivasmsApiKey ? `${dbData.ivasmsApiKey.slice(0, 12)}...${dbData.ivasmsApiKey.slice(-4)}` : "Not Set";
     let text = `⚙️ <b>বর্তমান সিস্টেম কনফিগারেশন</b>\n\n`;
     text += `⏱️ <b>Polling Delay:</b> <code>${dbData.checkDelay} ms</code>\n`;
-    text += `🔢 <b>Get Number Qty:</b> <code>${dbData.numberQty || 1}</code>\n\n`;
+    text += `🔢 <b>Get Number Qty:</b> <code>${dbData.numberQty || 1}</code>\n`;
+    text += `🔑 <b>iVASMS Key:</b> <code>${escapeHtml(maskedKey)}</code>\n\n`;
     text += `🔗 <b>API URLs (${dbData.apiUrls.length}):</b>\n`;
     dbData.apiUrls.forEach((url, i) => {
         text += `${i + 1}. <code>${url}</code>\n`;
@@ -663,7 +700,7 @@ bot.hears("ℹ️ Help / Guide", async (ctx) => {
     helpText += `1️⃣ <b>Add Number:</b> নম্বর বাল্ক ফরম্যাটে বা টেক্সট ফাইলে আপলোড করুন।\n`;
     helpText += `2️⃣ <b>Modify Rate:</b> সার্ভিস অথবা সার্ভিস+কান্ট্রি প্রতি ওটিপি রেট সেট করুন।\n`;
     helpText += `3️⃣ <b>Withdraw Requests:</b> পেন্ডিং উইথড্র রিকোয়েস্ট চেক ও প্রসেস করুন।\n`;
-    helpText += `4️⃣ <b>/adminmenu:</b> API, iVASMS API, Delay, Number Quantity এবং Custom Message ম্যানেজ করুন।\n`;
+    helpText += `4️⃣ <b>/adminmenu:</b> API, iVASMS API & Key, Delay, Number Quantity এবং Custom Message ম্যানেজ করুন।\n`;
 
     await ctx.reply(helpText, { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(()=>{});
 });
@@ -882,26 +919,25 @@ function startLiveOtpCheck(numberId, phoneNumber, serviceName, fallbackUserId, c
 
     const interval = setInterval(async () => {
         try {
+            if (Date.now() < ivasmsRateLimitUntil) return;
             let dbData = readDb();
             const baseApiUrls = dbData.apiUrls && dbData.apiUrls.length > 0 ? dbData.apiUrls : [
                 "https://panel.lamix.org/api/v1/messages?token=F03xiioltLwvYbIlS470UQ9XuVWkp-KlqC5f_r2yXhs",
                 "http://169.58.213.56/crapi/ALEIUS/viewstats?token=dsglfRknOC2y_94AAD164B4ED"
             ];
-            const allApiUrls = [...baseApiUrls, ...(dbData.ivasmsApiUrls || [])];
 
-            for (const baseUrl of allApiUrls) {
+            const sources = [
+                ...baseApiUrls.map(u => ({ url: u, key: "" })),
+                ...(dbData.ivasmsApiUrls || []).map(u => ({ url: u, key: dbData.ivasmsApiKey || "" }))
+            ];
+
+            for (const src of sources) {
                 try {
-                    const separator = baseUrl.includes("?") ? "&" : "?";
-                    const apiUrl = `${baseUrl}${separator}_cb=${Date.now()}`;
-
-                    const response = await fetch(apiUrl);
-                    const json = await response.json();
-                    
-                    const recordList = (json && (json.records || json.data)) ? (json.records || json.data) : [];
+                    const recordList = await fetchJsonFromUrl(src.url, src.key);
                     
                     if (Array.isArray(recordList)) {
                         const matchedActivations = recordList.filter(item => {
-                            const rawPhone = item.number || item.num || item.phone || "";
+                            const rawPhone = item.number || "";
                             const itemPhone = rawPhone.toString().replace(/[^\d]/g, "");
                             if (itemPhone.length < 7 || cleanUserPhone.length < 7) return false;
                             
@@ -911,7 +947,7 @@ function startLiveOtpCheck(numberId, phoneNumber, serviceName, fallbackUserId, c
                         });
                         
                         for (const activation of matchedActivations) {
-                            const rawMessage = activation ? (activation.content || activation.message || activation.text) : null;
+                            const rawMessage = activation ? activation.message : null;
 
                             if (rawMessage) {
                                 const otpCode = extractOtp(rawMessage);
@@ -938,7 +974,7 @@ function startLiveOtpCheck(numberId, phoneNumber, serviceName, fallbackUserId, c
                                         writeDb(dbData);
 
                                         const botUsername = botInfo ? botInfo.username : "Bot";
-                                        const detectedService = escapeHtml(activation.cli || activation.service || serviceName);
+                                        const detectedService = escapeHtml(activation.cli || serviceName);
                                         const safeRawMessage = escapeHtml(rawMessage);
                                         const safeCountryName = escapeHtml(countryName);
                                         const flag = getCountryFlag(countryName);
@@ -988,30 +1024,29 @@ function startLiveOtpCheck(numberId, phoneNumber, serviceName, fallbackUserId, c
 function startGlobalPanelListener() {
     setInterval(async () => {
         try {
+            if (Date.now() < ivasmsRateLimitUntil) return;
             let dbData = readDb();
             const baseGlobalApiUrls = dbData.apiUrls && dbData.apiUrls.length > 0 ? dbData.apiUrls : [
                 "https://panel.lamix.org/api/v1/messages?token=F03xiioltLwvYbIlS470UQ9XuVWkp-KlqC5f_r2yXhs",
                 "http://169.58.213.56/crapi/ALEIUS/viewstats?token=dsglfRknOC2y_94AAD164B4ED"
             ];
-            const allGlobalApiUrls = [...baseGlobalApiUrls, ...(dbData.ivasmsApiUrls || [])];
 
-            for (const baseUrl of allGlobalApiUrls) {
+            const sources = [
+                ...baseGlobalApiUrls.map(u => ({ url: u, key: "" })),
+                ...(dbData.ivasmsApiUrls || []).map(u => ({ url: u, key: dbData.ivasmsApiKey || "" }))
+            ];
+
+            for (const src of sources) {
                 try {
-                    const separator = baseUrl.includes("?") ? "&" : "?";
-                    const globalApiUrl = `${baseUrl}${separator}_cb=${Date.now()}`;
-
-                    const response = await fetch(globalApiUrl);
-                    const json = await response.json();
-
-                    const recordList = (json && (json.records || json.data)) ? (json.records || json.data) : [];
+                    const recordList = await fetchJsonFromUrl(src.url, src.key);
 
                     if (Array.isArray(recordList)) {
                         for (const activation of recordList) {
-                            const rawMessage = activation.content || activation.message || activation.text;
-                            let rawPhone = (activation.number || activation.num || activation.phone || "Unknown").toString();
+                            const rawMessage = activation.message;
+                            let rawPhone = (activation.number || "Unknown").toString();
                             let phoneNumber = rawPhone.replace(/[^\d]/g, "");
                             
-                            const serviceName = activation.cli || activation.service || "Global";
+                            const serviceName = activation.cli || "Global";
                             const otpCode = extractOtp(rawMessage);
 
                             if (otpCode && rawMessage) {
@@ -1316,6 +1351,14 @@ bot.on(["message:text", "message:document"], async (ctx) => {
         return;
     }
 
+    if (state.step === "awaiting_ivasms_key" && ctx.message.text) {
+        dbData.ivasmsApiKey = ctx.message.text.trim();
+        writeDb(dbData);
+        delete adminState[userId];
+        await ctx.reply("✅ iVASMS Bearer API Key সেভ করা হয়েছে!", { parse_mode: "HTML" }).catch(()=>{});
+        return;
+    }
+
     if (state.step === "awaiting_number_qty" && ctx.message.text) {
         const qtyNum = parseInt(ctx.message.text.trim());
         if (!isNaN(qtyNum) && qtyNum > 0) {
@@ -1433,6 +1476,7 @@ bot.catch((err) => {
 });
 
 bot.start({
+    drop_pending_updates: true,
     onStart: async (info) => {
         botInfo = info; 
         console.log(`🚀 Node.js Telegram OTP Bot Online (@${info.username})!`);
