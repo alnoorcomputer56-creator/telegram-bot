@@ -1,15 +1,16 @@
 {
   "name": "telegram-otp-bot",
   "version": "1.0.0",
+  "description": "Telegram OTP Bot with iVASMS and Multi-Panel API support",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
   },
   "dependencies": {
-    "grammy": "^1.21.1",
-    "undici": "^6.6.2"
+    "grammy": "^1.30.0",
+    "undici": "^6.19.8"
   },
   "engines": {
-    "node": ">=24.0.0"
+    "node": ">=18.0.0"
   }
 }
