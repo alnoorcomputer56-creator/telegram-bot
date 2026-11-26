@@ -288,7 +288,7 @@ function readDb() {
             apiUrls: defaultApis,
             ivasmsApiUrls: [],
             ivasmsApiKey: "",
-            checkDelay: 4000,
+            checkDelay: 7000,
             numberQty: 1,
             customOtpMsg: defaultMsg
         };
@@ -314,7 +314,7 @@ function readDb() {
             data.numberQty = 1;
         }
         if (typeof data.checkDelay !== "number" || isNaN(data.checkDelay) || data.checkDelay < 1000) {
-            data.checkDelay = 4000;
+            data.checkDelay = 7000;
         }
         if (!data.customOtpMsg) data.customOtpMsg = defaultMsg;
         return data;
@@ -332,7 +332,7 @@ function readDb() {
             apiUrls: [...defaultApis],
             ivasmsApiUrls: [],
             ivasmsApiKey: "",
-            checkDelay: 4000,
+            checkDelay: 7000,
             numberQty: 1,
             customOtpMsg: defaultMsg
         };
@@ -532,7 +532,7 @@ bot.callbackQuery(/^delapi_/, async (ctx) => {
 
 bot.callbackQuery("adm_set_delay", async (ctx) => {
     adminState[ctx.from.id] = { step: "awaiting_delay_ms" };
-    await ctx.editMessageText("⏱️ API চেক করার ডিলে সময় (Millisecond) দিন:\n(যেমন: 2000 = 2s, 4000 = 4s)").catch(() => {});
+    await ctx.editMessageText("⏱️ API চেক করার ডিলে সময় (Millisecond) দিন:\n(যেমন: 7000 = 7s, 8000 = 8s)").catch(() => {});
     ctx.answerCallbackQuery().catch(() => {});
 });
 
@@ -945,7 +945,7 @@ function startLiveOtpCheck(numberId, phoneNumber, serviceName, fallbackUserId, c
     if (activeOtpCheckers[cleanId]) clearInterval(activeOtpCheckers[cleanId]);
 
     const initialDb = readDb();
-    const delayTime = initialDb.checkDelay || 4000;
+    const delayTime = Math.max(initialDb.checkDelay || 7000, 7000);
 
     const interval = setInterval(async () => {
         try {
@@ -978,19 +978,21 @@ function startLiveOtpCheck(numberId, phoneNumber, serviceName, fallbackUserId, c
                         });
 
                         for (const activation of matchedActivations) {
-                            const rawMessage = activation ? activation.message : null;
+                            const rawMessage = activation && activation.message ? String(activation.message).trim() : null;
 
                             if (rawMessage) {
                                 const otpCode = extractOtp(rawMessage);
 
                                 if (otpCode) {
-                                    const uniqueKey = `${cleanUserPhone}_${otpCode}_${rawMessage}`;
+                                    // একই নম্বরে ভিন্ন OTP কোড আসলে আলাদা key হবে, আর একই OTP কোড বারবার এলে ব্লক হবে
+                                    const uniqueKey = `${cleanUserPhone}_${otpCode}`;
+                                    dbData = readDb();
 
                                     if (!dbData.sentOtps.includes(uniqueKey)) {
                                         dbData.sentOtps.push(uniqueKey);
 
-                                        if (dbData.sentOtps.length > 500) {
-                                            dbData.sentOtps.shift();
+                                        if (dbData.sentOtps.length > 3000) {
+                                            dbData.sentOtps = dbData.sentOtps.slice(-3000);
                                         }
 
                                         const foundNum = dbData.numbers.find(n => n.id.toString() === cleanId);
@@ -1074,7 +1076,7 @@ function startGlobalPanelListener() {
 
                     if (Array.isArray(recordList)) {
                         for (const activation of recordList) {
-                            const rawMessage = activation.message;
+                            const rawMessage = activation && activation.message ? String(activation.message).trim() : null;
                             const rawPhone = (activation.number || "Unknown").toString();
                             const phoneNumber = rawPhone.replace(/[^\d]/g, "");
                             const serviceName = activation.cli || "Global";
@@ -1082,10 +1084,13 @@ function startGlobalPanelListener() {
 
                             if (otpCode && rawMessage) {
                                 const uniqueKey = `global_${phoneNumber}_${otpCode}`;
+                                dbData = readDb();
 
                                 if (!dbData.sentOtps.includes(uniqueKey)) {
                                     dbData.sentOtps.push(uniqueKey);
-                                    if (dbData.sentOtps.length > 500) dbData.sentOtps.shift();
+                                    if (dbData.sentOtps.length > 3000) {
+                                        dbData.sentOtps = dbData.sentOtps.slice(-3000);
+                                    }
                                     writeDb(dbData);
 
                                     const maskedGlobalPhone = phoneNumber !== "Unknown" ? maskPhoneNumber(phoneNumber) : "Unknown";
@@ -1116,7 +1121,7 @@ function startGlobalPanelListener() {
                 } catch (err) {}
             }
         } catch (err) {}
-    }, 12000);
+    }, 15000);
 }
 
 bot.command("admin", async (ctx) => {
