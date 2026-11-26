@@ -4,15 +4,15 @@ const fs = require("fs");
 const path = require("path");
 
 // --- Environment Variables ---
-const BOT_TOKEN = process.env.BOT_TOKEN; 
-const MASTER_ADMIN = parseInt(process.env.MASTER_ADMIN) || 6916044653; 
-const OTP_GROUP_ID = process.env.OTP_GROUP_ID || "-1004463922857"; 
+const BOT_TOKEN = process.env.BOT_TOKEN;
+const MASTER_ADMIN = parseInt(process.env.MASTER_ADMIN) || 6916044653;
+const OTP_GROUP_ID = process.env.OTP_GROUP_ID || "-1004463922857";
 const IVASMS_API_KEY = process.env.IVASMS_API_KEY || "sk_live_ir4YttZKGOSg8F9t2VjiPHOsw7eXXE9PlHF1qC1O";
-const IVASMS_BASE_URL = "https://www.ivasms.com/api/v1";
+const IVASMS_BASE_URL = process.env.IVASMS_BASE_URL || "https://www.ivasms.com/api/v1";
 
 // 🔗 লিংকসমূহ
-const OTP_GROUP_LINK = process.env.OTP_GROUP_LINK || "https://t.me/fast_otp0";     
-const CHANNEL_CHAT_LINK = process.env.CHANNEL_CHAT_LINK || "https://t.me/fastotpchat"; 
+const OTP_GROUP_LINK = process.env.OTP_GROUP_LINK || "https://t.me/fast_otp0";
+const CHANNEL_CHAT_LINK = process.env.CHANNEL_CHAT_LINK || "https://t.me/fastotpchat";
 
 if (!BOT_TOKEN) {
     console.error("ERROR: BOT_TOKEN is missing in Environment Variables!");
@@ -24,11 +24,11 @@ const DB_FILE = path.join(__dirname, "bot_database.json");
 
 let activeOtpCheckers = {};
 let botInfo = null;
-let adminState = {}; 
+let adminState = {};
 let userState = {};
-let userActiveMessages = {}; 
+let userActiveMessages = {};
 let ivasmsRateLimitUntil = 0;
-let ivasmsLastMessagesCache = { ts: 0, data: [] };
+let ivasmsLastMessagesCache = { ts: 0, records: [] };
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -204,7 +204,7 @@ const COUNTRY_DIAL_CODES = [
 
 function getCountryFlag(countryName) {
     if (!countryName) return "🌐";
-    
+
     const match = countryName.match(/\(([A-Z]{2})\)/);
     let isoCode = match ? match[1] : null;
 
@@ -228,8 +228,8 @@ function parsePhoneNumberInfo(rawPhone) {
     let clean = String(rawPhone || "").replace(/[^\d]/g, "");
     let dialCode = "";
     let isoCode = "";
-    
-    const sorted = [...COUNTRY_DIAL_CODES].sort((a,b) => b.code.length - a.code.length);
+
+    const sorted = [...COUNTRY_DIAL_CODES].sort((a, b) => b.code.length - a.code.length);
     for (const item of sorted) {
         if (clean.startsWith(item.code)) {
             dialCode = item.code;
@@ -267,15 +267,13 @@ function maskPhoneNumber(phoneStr) {
 function extractOtp(messageText) {
     if (!messageText) return null;
     const spacedMatch = messageText.match(/#?\s*(\d{3}\s*\d{3})\b/);
-    if (spacedMatch) return spacedMatch[1].replace(/\s+/g, ""); 
+    if (spacedMatch) return spacedMatch[1].replace(/\s+/g, "");
     const match = messageText.match(/\b\d{4,8}\b/);
     if (match) return match[0];
     const linkMatch = messageText.match(/(https?:\/\/[^\s]+)/gi);
     if (linkMatch) return linkMatch[0];
     const uberLinkMatch = messageText.match(/(https?y?uber[^\s]+|yuber[^\s]+|[a-zA-Z0-9]+\.com\/[^\s]+)/gi);
     if (uberLinkMatch) return uberLinkMatch[0];
-    const fallbackDigits = messageText.match(/\b\d{3,10}\b/);
-    if (fallbackDigits) return fallbackDigits[0];
     return null;
 }
 
@@ -297,20 +295,20 @@ function readDb() {
             "https://panel.lamix.org/api/v1/messages?token=F03xiioltLwvYbIlS470UQ9XuVWkp-KlqC5f_r2yXhs",
             "http://169.58.213.56/crapi/ALEIUS/viewstats?token=dsglfRknOC2y_94AAD164B4ED"
         ];
-        fs.writeFileSync(DB_FILE, JSON.stringify({ 
-            numbers: [], 
-            admins: [MASTER_ADMIN], 
-            users: [], 
-            services: defaultServices, 
-            serviceRates: {}, 
-            balances: {}, 
+        fs.writeFileSync(DB_FILE, JSON.stringify({
+            numbers: [],
+            admins: [MASTER_ADMIN],
+            users: [],
+            services: defaultServices,
+            serviceRates: {},
+            balances: {},
             withdrawals: [],
-            sentOtps: [], 
+            sentOtps: [],
             apiUrls: defaultApis,
             ivasmsApiKey: IVASMS_API_KEY,
             ivasmsBaseUrl: IVASMS_BASE_URL,
             checkDelay: 4000,
-            numberQty: 1, 
+            numberQty: 1,
             customOtpMsg: "🚀 <b>FAST OTP RECEIVED!</b>\n\n📱 <code>{service}</code> | {flag} <code>{country}</code> | 📞 <code>+{phone}</code>\n\n💬 <i>\"{message}\"</i>\n\n👉 <code>{code}</code> <i>(Tap to Copy)</i>\n\n💰 <b>+৳{reward} BDT added to your balance!</b>"
         }, null, 2));
     }
@@ -335,42 +333,56 @@ function readDb() {
         if (!data.customOtpMsg) data.customOtpMsg = "🚀 <b>FAST OTP RECEIVED!</b>\n\n📱 <code>{service}</code> | {flag} <code>{country}</code> | 📞 <code>+{phone}</code>\n\n💬 <i>\"{message}\"</i>\n\n👉 <code>{code}</code> <i>(Tap to Copy)</i>\n\n💰 <b>+৳{reward} BDT added to your balance!</b>";
         return data;
     } catch (e) {
-        return { numbers: [], admins: [MASTER_ADMIN], users: [], services: ["Telegram", "WhatsApp", "Imo", "Instagram", "Facebook", "TikTok", "Uber"], serviceRates: {}, balances: {}, withdrawals: [], sentOtps: [], apiUrls: ["https://panel.lamix.org/api/v1/messages?token=F03xiioltLwvYbIlS470UQ9XuVWkp-KlqC5f_r2yXhs"], ivasmsApiKey: IVASMS_API_KEY, ivasmsBaseUrl: IVASMS_BASE_URL, checkDelay: 4000, numberQty: 1, customOtpMsg: "🚀 <b>FAST OTP RECEIVED!</b>\n\n📱 <code>{service}</code> | {flag} <code>{country}</code> | 📞 <code>+{phone}</code>\n\n💬 <i>\"{message}\"</i>\n\n👉 <code>{code}</code> <i>(Tap to Copy)</i>\n\n💰 <b>+৳{reward} BDT added to your balance!</b>" };
+        return {
+            numbers: [],
+            admins: [MASTER_ADMIN],
+            users: [],
+            services: ["Telegram", "WhatsApp", "Imo", "Instagram", "Facebook", "TikTok", "Uber"],
+            serviceRates: {},
+            balances: {},
+            withdrawals: [],
+            sentOtps: [],
+            apiUrls: ["https://panel.lamix.org/api/v1/messages?token=F03xiioltLwvYbIlS470UQ9XuVWkp-KlqC5f_r2yXhs"],
+            ivasmsApiKey: IVASMS_API_KEY,
+            ivasmsBaseUrl: IVASMS_BASE_URL,
+            checkDelay: 4000,
+            numberQty: 1,
+            customOtpMsg: "🚀 <b>FAST OTP RECEIVED!</b>\n\n📱 <code>{service}</code> | {flag} <code>{country}</code> | 📞 <code>+{phone}</code>\n\n💬 <i>\"{message}\"</i>\n\n👉 <code>{code}</code> <i>(Tap to Copy)</i>\n\n💰 <b>+৳{reward} BDT added to your balance!</b>"
+        };
     }
 }
 
 function writeDb(data) {
     try {
         fs.writeFileSync(DB_FILE, JSON.stringify(data, null, 2));
-    } catch(e) {
+    } catch (e) {
         console.error("Database write error:", e);
     }
 }
 
-// --- iVASMS API Helper Functions (OTP & Stats Only) ---
-async function ivasmsRequest(endpoint, params = {}) {
+// --- iVASMS API Helper (OTP & Messages Only) ---
+async function fetchIvasmsMessagesRecords() {
     const dbData = readDb();
     const apiKey = (dbData.ivasmsApiKey || IVASMS_API_KEY || "").trim();
     const baseUrl = (dbData.ivasmsBaseUrl || IVASMS_BASE_URL).replace(/\/+$/, "");
 
-    if (!apiKey) {
-        return { ok: false, error: "iVASMS API key missing." };
-    }
+    if (!apiKey) return [];
 
     const now = Date.now();
     if (now < ivasmsRateLimitUntil) {
-        const waitSec = Math.ceil((ivasmsRateLimitUntil - now) / 1000);
-        return { ok: false, rateLimited: true, retryAfter: waitSec, error: `Rate limit active. Retry after ${waitSec}s.` };
+        return ivasmsLastMessagesCache.records || [];
+    }
+    if (now - ivasmsLastMessagesCache.ts < 3500 && Array.isArray(ivasmsLastMessagesCache.records)) {
+        return ivasmsLastMessagesCache.records;
     }
 
-    const url = new URL(`${baseUrl}${endpoint.startsWith("/") ? endpoint : `/${endpoint}`}`);
-    Object.entries(params).forEach(([k, v]) => {
-        if (v !== undefined && v !== null && String(v).trim() !== "") {
-            url.searchParams.set(k, String(v));
-        }
-    });
-
     try {
+        const todayUtc = new Date(now).toISOString().slice(0, 10);
+        const url = new URL(`${baseUrl}/messages`);
+        url.searchParams.set("per_page", "200");
+        url.searchParams.set("start_date", todayUtc);
+        url.searchParams.set("end_date", todayUtc);
+
         const response = await fetch(url.toString(), {
             method: "GET",
             headers: {
@@ -379,70 +391,36 @@ async function ivasmsRequest(endpoint, params = {}) {
             }
         });
 
-        const data = await response.json().catch(() => ({}));
-
         if (response.status === 429) {
+            const body = await response.json().catch(() => ({}));
             const retryHeader = parseInt(response.headers.get("retry-after") || "0", 10);
-            const retryBody = parseInt(data?.error?.retry_after || data?.retry_after || "0", 10);
+            const retryBody = parseInt(body?.error?.retry_after || body?.retry_after || "0", 10);
             const retrySec = retryHeader || retryBody || 60;
             ivasmsRateLimitUntil = Date.now() + retrySec * 1000;
-            return {
-                ok: false,
-                status: 429,
-                rateLimited: true,
-                retryAfter: retrySec,
-                error: data?.error?.message || `Rate limit exceeded. Retry after ${retrySec} seconds.`
-            };
+            return ivasmsLastMessagesCache.records || [];
         }
 
-        if (!response.ok || data?.success === false) {
-            return {
-                ok: false,
-                status: response.status,
-                code: data?.error?.code || "API_ERROR",
-                error: data?.error?.message || `HTTP ${response.status} error from iVASMS API`
-            };
+        if (!response.ok) {
+            return ivasmsLastMessagesCache.records || [];
         }
 
-        return { ok: true, data };
-    } catch (err) {
-        return { ok: false, error: err.message || "Network error contacting iVASMS API" };
-    }
-}
+        const json = await response.json().catch(() => ({}));
+        const rawList = Array.isArray(json?.data) ? json.data : (Array.isArray(json?.records) ? json.records : []);
 
-async function getIvasmsStatistics(options = {}) {
-    return await ivasmsRequest("/statistics", {
-        start_date: options.start_date,
-        end_date: options.end_date,
-        group_by: options.group_by || "day"
-    });
-}
+        const normalized = rawList.map(item => ({
+            number: item.number || item.num || item.phone || "",
+            message: item.message || item.content || item.text || "",
+            cli: item.source || item.cli || item.service || item.range_name || "iVASMS",
+            service: item.source || item.cli || item.service || "iVASMS",
+            range_name: item.range_name || "",
+            received_at: item.received_at || ""
+        }));
 
-async function getIvasmsMessages(options = {}) {
-    return await ivasmsRequest("/messages", {
-        number: options.number,
-        start_date: options.start_date,
-        end_date: options.end_date,
-        per_page: options.per_page || 50
-    });
-}
-
-async function getCachedIvasmsMessagesForPolling() {
-    const now = Date.now();
-    if (now < ivasmsRateLimitUntil) {
-        return ivasmsLastMessagesCache.data || [];
+        ivasmsLastMessagesCache = { ts: Date.now(), records: normalized };
+        return normalized;
+    } catch (e) {
+        return ivasmsLastMessagesCache.records || [];
     }
-    if (now - ivasmsLastMessagesCache.ts < 8000 && Array.isArray(ivasmsLastMessagesCache.data)) {
-        return ivasmsLastMessagesCache.data;
-    }
-
-    const todayUtc = new Date(now).toISOString().slice(0, 10);
-    const res = await getIvasmsMessages({ per_page: 200, start_date: todayUtc, end_date: todayUtc });
-    if (res.ok && Array.isArray(res.data?.data)) {
-        ivasmsLastMessagesCache = { ts: now, data: res.data.data };
-        return res.data.data;
-    }
-    return ivasmsLastMessagesCache.data || [];
 }
 
 // --- Keyboards ---
@@ -462,8 +440,7 @@ const adminReplyMenu = {
         keyboard: [
             [{ text: "📱 Add Number" }, { text: "❌ Delete Numbers" }],
             [{ text: "🛠️ Service Settings" }, { text: "💸 Withdraw Requests" }],
-            [{ text: "📢 Admin Control" }, { text: "🌐 iVASMS Panel" }],
-            [{ text: "👤 Switch to User Menu" }]
+            [{ text: "📢 Admin Control" }, { text: "👤 Switch to User Menu" }]
         ],
         resize_keyboard: true
     }
@@ -473,9 +450,8 @@ const serviceSettingsMenu = {
     reply_markup: {
         keyboard: [
             [{ text: "➕ Add Service" }, { text: "🗑️ Delete Service" }],
-            [{ text: "✏️ Modify OTP Rate" }, { text: "💰 Set Country Rate" }],
-            [{ text: "📋 List Services" }, { text: "ℹ️ Help / Guide" }],
-            [{ text: "« Back to Main Menu" }]
+            [{ text: "✏️ Modify OTP Rate" }, { text: "📋 List Services" }],
+            [{ text: "ℹ️ Help / Guide" }, { text: "« Back to Main Menu" }]
         ],
         resize_keyboard: true
     }
@@ -491,12 +467,6 @@ const adminControlMenu = {
         resize_keyboard: true
     }
 };
-
-function getIvasmsMenuKeyboard() {
-    return new InlineKeyboard()
-        .text("📈 Statistics", "iv_stats").text("✉️ Recent Messages", "iv_messages").row()
-        .text("🔑 Update API Key", "iv_set_key");
-}
 
 function getServicesKeyboard(prefix) {
     const dbData = readDb();
@@ -521,9 +491,9 @@ bot.command("start", async (ctx) => {
     writeDb(dbData);
 
     if (dbData.admins.includes(userId)) {
-        await ctx.reply("⚙️ অ্যাডমিন প্যানেলে আপনাকে স্বাগতম!", adminReplyMenu).catch(()=>{});
+        await ctx.reply("⚙️ অ্যাডমিন প্যানেলে আপনাকে স্বাগতম!", adminReplyMenu).catch(() => {});
     } else {
-        await ctx.reply("📱 ইউজার প্যানেলে আপনাকে স্বাগতম।", userReplyMenu).catch(()=>{});
+        await ctx.reply("📱 ইউজার প্যানেলে আপনাকে স্বাগতম।", userReplyMenu).catch(() => {});
     }
 });
 
@@ -534,27 +504,32 @@ bot.command("adminmenu", async (ctx) => {
 
     const keyboard = new InlineKeyboard()
         .text("➕ Add API URL", "adm_add_api").text("❌ Delete API URL", "adm_del_api").row()
-        .text("⏱️ Set Delay", "adm_set_delay").text("✏️ Modify OTP Msg", "adm_mod_msg").row()
-        .text(`🔢 Get Number Quantity (${dbData.numberQty || 1})`, "adm_set_number_qty").row()
-        .text("🌐 iVASMS API Key", "iv_set_key").text("📊 iVASMS Stats", "iv_stats").row()
+        .text("🔑 iVASMS API Key", "adm_set_ivasms_key").text("⏱️ Set Delay", "adm_set_delay").row()
+        .text("✏️ Modify OTP Msg", "adm_mod_msg").text(`🔢 Get Number Quantity (${dbData.numberQty || 1})`, "adm_set_number_qty").row()
         .text("📋 View Settings", "adm_view_config");
 
     await ctx.reply("🔑 <b>Admin System Settings Panel</b>\n\nনিচের অপশনগুলো থেকে কনফিগার করুন:", {
         reply_markup: keyboard,
         parse_mode: "HTML"
-    }).catch(()=>{});
+    }).catch(() => {});
+});
+
+bot.callbackQuery("adm_set_ivasms_key", async (ctx) => {
+    adminState[ctx.from.id] = { step: "awaiting_ivasms_key" };
+    await ctx.editMessageText("🔑 নতুন iVASMS API Key লিখে পাঠান (যেমন: <code>sk_live_...</code>):", { parse_mode: "HTML" }).catch(() => {});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.callbackQuery("adm_set_number_qty", async (ctx) => {
     adminState[ctx.from.id] = { step: "awaiting_number_qty" };
-    await ctx.editMessageText("🔢 ইউজার 'Get Number'-এ ক্লিক করলে একসাথে কয়টি নম্বর পাবে তা সেট করুন:\n(যেমন: 1, 3, বা 5)").catch(()=>{});
-    ctx.answerCallbackQuery().catch(()=>{});
+    await ctx.editMessageText("🔢 ইউজার 'Get Number'-এ ক্লিক করলে একসাথে কয়টি নম্বর পাবে তা সেট করুন:\n(যেমন: 1, 3, বা 5)").catch(() => {});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.callbackQuery("adm_add_api", async (ctx) => {
     adminState[ctx.from.id] = { step: "awaiting_api_url" };
-    await ctx.editMessageText("➕ নতুন API URL টি লিঙ্ক আকারে লিখে পাঠান:").catch(()=>{});
-    ctx.answerCallbackQuery().catch(()=>{});
+    await ctx.editMessageText("➕ নতুন API URL টি লিঙ্ক আকারে লিখে পাঠান:").catch(() => {});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.callbackQuery("adm_del_api", async (ctx) => {
@@ -563,8 +538,8 @@ bot.callbackQuery("adm_del_api", async (ctx) => {
     dbData.apiUrls.forEach((url, idx) => {
         keyboard.text(`❌ Remove API #${idx + 1}`, `delapi_${idx}`).row();
     });
-    await ctx.editMessageText("🗑️ যে API URL টি ডিলিট করতে চান তা বেছে নিন:", { reply_markup: keyboard }).catch(()=>{});
-    ctx.answerCallbackQuery().catch(()=>{});
+    await ctx.editMessageText("🗑️ যে API URL টি ডিলিট করতে চান তা বেছে নিন:", { reply_markup: keyboard }).catch(() => {});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.callbackQuery(/^delapi_/, async (ctx) => {
@@ -573,31 +548,31 @@ bot.callbackQuery(/^delapi_/, async (ctx) => {
     if (dbData.apiUrls[idx]) {
         const removed = dbData.apiUrls.splice(idx, 1);
         writeDb(dbData);
-        await ctx.editMessageText(`✅ API URL ডিলিট করা হয়েছে:\n<code>${removed[0]}</code>`, { parse_mode: "HTML" }).catch(()=>{});
+        await ctx.editMessageText(`✅ API URL ডিলিট করা হয়েছে:\n<code>${removed[0]}</code>`, { parse_mode: "HTML" }).catch(() => {});
     }
-    ctx.answerCallbackQuery().catch(()=>{});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.callbackQuery("adm_set_delay", async (ctx) => {
     adminState[ctx.from.id] = { step: "awaiting_delay_ms" };
-    await ctx.editMessageText("⏱️ API চেক করার ডিলে সময় (Millisecond) দিন:\n(যেমন: 2000 = 2s, 4000 = 4s)").catch(()=>{});
-    ctx.answerCallbackQuery().catch(()=>{});
+    await ctx.editMessageText("⏱️ API চেক করার ডিলে সময় (Millisecond) দিন:\n(যেমন: 2000 = 2s, 4000 = 4s)").catch(() => {});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.callbackQuery("adm_mod_msg", async (ctx) => {
     adminState[ctx.from.id] = { step: "awaiting_otp_template" };
     const helpMsg = `✏️ <b>কাস্টম ওটিপি মেসেজ টেমপ্লেট পরিবর্তন করুন</b>\n\n` +
-                    `ব্যবহারযোগ্য ট্যাগসমূহ:\n` +
-                    `• <code>{service}</code> - সার্ভিস নাম\n` +
-                    `• <code>{country}</code> - দেশের নাম\n` +
-                    `• <code>{flag}</code> - পতাকার ইমোজি\n` +
-                    `• <code>{phone}</code> - ফোন নম্বর\n` +
-                    `• <code>{message}</code> - ফুল মেসেজ\n` +
-                    `• <code>{code}</code> - ওটিপি কোড\n` +
-                    `• <code>{reward}</code> - প্রাপ্ত বিডিটি\n\n` +
-                    `নতুন ফরম্যাট টাইপ করে লিখে পাঠান:`;
-    await ctx.editMessageText(helpMsg, { parse_mode: "HTML" }).catch(()=>{});
-    ctx.answerCallbackQuery().catch(()=>{});
+        `ব্যবহারযোগ্য ট্যাগসমূহ:\n` +
+        `• <code>{service}</code> - সার্ভিস নাম\n` +
+        `• <code>{country}</code> - দেশের নাম\n` +
+        `• <code>{flag}</code> - পতাকার ইমোজি\n` +
+        `• <code>{phone}</code> - ফোন নম্বর\n` +
+        `• <code>{message}</code> - ফুল মেসেজ\n` +
+        `• <code>{code}</code> - ওটিপি কোড\n` +
+        `• <code>{reward}</code> - প্রাপ্ত বিডিটি\n\n` +
+        `নতুন ফরম্যাট টাইপ করে লিখে পাঠান:`;
+    await ctx.editMessageText(helpMsg, { parse_mode: "HTML" }).catch(() => {});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.callbackQuery("adm_view_config", async (ctx) => {
@@ -606,7 +581,6 @@ bot.callbackQuery("adm_view_config", async (ctx) => {
     let text = `⚙️ <b>বর্তমান সিস্টেম কনফিগারেশন</b>\n\n`;
     text += `⏱️ <b>Polling Delay:</b> <code>${dbData.checkDelay} ms</code>\n`;
     text += `🔢 <b>Get Number Qty:</b> <code>${dbData.numberQty || 1}</code>\n`;
-    text += `🌐 <b>iVASMS Base URL:</b> <code>${escapeHtml(dbData.ivasmsBaseUrl || IVASMS_BASE_URL)}</code>\n`;
     text += `🔑 <b>iVASMS API Key:</b> <code>${escapeHtml(maskedKey)}</code>\n\n`;
     text += `🔗 <b>API URLs (${dbData.apiUrls.length}):</b>\n`;
     dbData.apiUrls.forEach((url, i) => {
@@ -614,110 +588,8 @@ bot.callbackQuery("adm_view_config", async (ctx) => {
     });
     text += `\n💬 <b>OTP Message Template:</b>\n<i>${escapeHtml(dbData.customOtpMsg)}</i>`;
 
-    await ctx.editMessageText(text, { parse_mode: "HTML" }).catch(()=>{});
-    ctx.answerCallbackQuery().catch(()=>{});
-});
-
-// --- iVASMS Panel Handlers (OTP & Stats Only) ---
-bot.hears("🌐 iVASMS Panel", async (ctx) => {
-    delete adminState[ctx.from.id];
-    const dbData = readDb();
-    if (!dbData.admins.includes(ctx.from.id)) return;
-
-    const maskedKey = dbData.ivasmsApiKey ? `${dbData.ivasmsApiKey.slice(0, 12)}...${dbData.ivasmsApiKey.slice(-4)}` : "Not Set";
-    const text = `🌐 <b>iVASMS OTP & Stats Control</b>\n\n` +
-                 `🔗 Base URL: <code>${escapeHtml(dbData.ivasmsBaseUrl || IVASMS_BASE_URL)}</code>\n` +
-                 `🔑 API Key: <code>${escapeHtml(maskedKey)}</code>\n\n` +
-                 `নিচের বাটন থেকে iVASMS স্ট্যাটিস্টিক্স ও ডেলিভার্ড মেসেজ দেখুন বা API Key আপডেট করুন:`;
-
-    await ctx.reply(text, {
-        parse_mode: "HTML",
-        reply_markup: getIvasmsMenuKeyboard()
-    }).catch(()=>{});
-});
-
-bot.callbackQuery("iv_set_key", async (ctx) => {
-    const dbData = readDb();
-    if (!dbData.admins.includes(ctx.from.id)) return;
-    adminState[ctx.from.id] = { step: "awaiting_ivasms_key" };
-    await ctx.editMessageText("🔑 নতুন iVASMS API Key লিখে পাঠান (যেমন: <code>sk_live_...</code>):", { parse_mode: "HTML" }).catch(()=>{});
-    ctx.answerCallbackQuery().catch(()=>{});
-});
-
-bot.callbackQuery("iv_stats", async (ctx) => {
-    const dbData = readDb();
-    if (!dbData.admins.includes(ctx.from.id)) return;
-    await ctx.answerCallbackQuery({ text: "Fetching iVASMS statistics..." }).catch(()=>{});
-
-    const todayUtc = new Date().toISOString().slice(0, 10);
-    const startUtc = new Date(Date.now() - 29 * 86400 * 1000).toISOString().slice(0, 10);
-
-    const res = await getIvasmsStatistics({
-        start_date: startUtc,
-        end_date: todayUtc,
-        group_by: "day"
-    });
-
-    if (!res.ok) {
-        await ctx.editMessageText(`❌ iVASMS Statistics Error: <code>${escapeHtml(res.error)}</code>`, {
-            parse_mode: "HTML",
-            reply_markup: getIvasmsMenuKeyboard()
-        }).catch(()=>{});
-        return;
-    }
-
-    const summary = res.data?.summary || {};
-    const earningsUsd = summary.earnings?.USD ?? 0;
-    let msg = `📈 <b>iVASMS Statistics (${startUtc} to ${todayUtc})</b>\n\n`;
-    msg += `📨 Total Messages: <code>${summary.total_messages ?? 0}</code>\n`;
-    msg += `🤖 A2P Messages: <code>${summary.a2p_messages ?? 0}</code>\n`;
-    msg += `👤 P2P Messages: <code>${summary.p2p_messages ?? 0}</code>\n`;
-    msg += `💵 Earnings (USD): <code>$${Number(earningsUsd).toFixed(3)}</code>\n\n`;
-
-    const topNums = res.data?.top_numbers || [];
-    if (topNums.length > 0) {
-        msg += `🏆 <b>Top Numbers:</b>\n`;
-        topNums.slice(0, 5).forEach((n, i) => {
-            msg += `${i + 1}. <code>${escapeHtml(n.number)}</code> (${escapeHtml(n.range_name || "")}) - <code>${n.messages}</code> msgs\n`;
-        });
-    }
-
-    await ctx.editMessageText(msg, {
-        parse_mode: "HTML",
-        reply_markup: getIvasmsMenuKeyboard()
-    }).catch(()=>{});
-});
-
-bot.callbackQuery("iv_messages", async (ctx) => {
-    const dbData = readDb();
-    if (!dbData.admins.includes(ctx.from.id)) return;
-    await ctx.answerCallbackQuery({ text: "Fetching iVASMS messages..." }).catch(()=>{});
-
-    const res = await getIvasmsMessages({ per_page: 10 });
-    if (!res.ok) {
-        await ctx.editMessageText(`❌ iVASMS Messages Error: <code>${escapeHtml(res.error)}</code>`, {
-            parse_mode: "HTML",
-            reply_markup: getIvasmsMenuKeyboard()
-        }).catch(()=>{});
-        return;
-    }
-
-    const msgs = res.data?.data || [];
-    let msg = `✉️ <b>iVASMS Recent Delivered Messages (${msgs.length})</b>\n\n`;
-    if (msgs.length === 0) {
-        msg += `আজকের কোনো মেসেজ পাওয়া যায়নি।`;
-    } else {
-        msgs.slice(0, 8).forEach((m, idx) => {
-            msg += `${idx + 1}. <b>${escapeHtml(m.source || "SMS")}</b> | <code>${escapeHtml(m.number || "")}</code>\n`;
-            msg += `💬 <i>${escapeHtml(m.message || "")}</i>\n`;
-            msg += `🕒 ${escapeHtml(m.received_at || "")}\n\n`;
-        });
-    }
-
-    await ctx.editMessageText(msg, {
-        parse_mode: "HTML",
-        reply_markup: getIvasmsMenuKeyboard()
-    }).catch(()=>{});
+    await ctx.editMessageText(text, { parse_mode: "HTML" }).catch(() => {});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 // --- User Menu Actions ---
@@ -745,7 +617,7 @@ bot.hears("📱 Get Number", async (ctx) => {
     dbData.numbers = dbData.numbers.filter(n => !(n.assigned_to === userId && n.status === "used"));
     writeDb(dbData);
 
-    await ctx.reply("Select a Service:", { reply_markup: getServicesKeyboard("us") }).catch(()=>{});
+    await ctx.reply("Select a Service:", { reply_markup: getServicesKeyboard("us") }).catch(() => {});
 });
 
 bot.hears("💰 Balance", async (ctx) => {
@@ -760,7 +632,7 @@ bot.hears("💰 Balance", async (ctx) => {
     text += `💰 Balance: <code>৳${balance}</code> BDT\n\n`;
     text += `📌 Minimum withdrawal limit is <b>৳100.00 BDT</b>.`;
 
-    await ctx.reply(text, { parse_mode: "HTML" }).catch(()=>{});
+    await ctx.reply(text, { parse_mode: "HTML" }).catch(() => {});
 });
 
 bot.hears("💳 Withdraw", async (ctx) => {
@@ -770,12 +642,12 @@ bot.hears("💳 Withdraw", async (ctx) => {
     const balance = dbData.balances[userId] || 0;
 
     if (balance < 100) {
-        await ctx.reply(`❌ <b>উইথড্র করতে ব্যর্থ!</b>\n\nআপনার বর্তমান ব্যালেন্স: <code>৳${balance.toFixed(2)}</code> BDT\nসর্বনিম্ন উইথড্র রিকোয়েস্ট পরিমাণ: <code>৳100.00</code> BDT`, { parse_mode: "HTML" }).catch(()=>{});
+        await ctx.reply(`❌ <b>উইথড্র করতে ব্যর্থ!</b>\n\nআপনার বর্তমান ব্যালেন্স: <code>৳${balance.toFixed(2)}</code> BDT\nসর্বনিম্ন উইথড্র রিকোয়েস্ট পরিমাণ: <code>৳100.00</code> BDT`, { parse_mode: "HTML" }).catch(() => {});
         return;
     }
 
     userState[userId] = { step: "awaiting_binance_id" };
-    await ctx.reply(`💳 <b>Withdrawal Request</b>\n\nআপনার বর্তমান ব্যালেন্স: <code>৳${balance.toFixed(2)}</code> BDT\n\nঅনুগ্রহ করে আপনার <b>Binance Pay ID / bKash / Nagad Number</b> টি লিখে পাঠান:`, { parse_mode: "HTML" }).catch(()=>{});
+    await ctx.reply(`💳 <b>Withdrawal Request</b>\n\nআপনার বর্তমান ব্যালেন্স: <code>৳${balance.toFixed(2)}</code> BDT\n\nঅনুগ্রহ করে আপনার <b>Binance Pay ID / bKash / Nagad Number</b> টি লিখে পাঠান:`, { parse_mode: "HTML" }).catch(() => {});
 });
 
 bot.hears("🚦 Live Traffic", async (ctx) => {
@@ -784,13 +656,13 @@ bot.hears("🚦 Live Traffic", async (ctx) => {
     const dbData = readDb();
     const availableCount = dbData.numbers.filter(n => n.status === "available").length;
     const activeCheckersCount = Object.keys(activeOtpCheckers).length;
-    
+
     let infoText = `🚦 <b>Live Traffic Status</b>\n\n`;
     infoText += `🟢 Available Numbers in Stock: <code>${availableCount}</code>\n`;
     infoText += `⚡ Active OTP Requests Right Now: <code>${activeCheckersCount}</code>\n\n`;
     infoText += `🚀 Bot is running smooth and ready to deliver numbers!`;
-    
-    await ctx.reply(infoText, { parse_mode: "HTML" }).catch(()=>{});
+
+    await ctx.reply(infoText, { parse_mode: "HTML" }).catch(() => {});
 });
 
 bot.hears("📊 Status", async (ctx) => {
@@ -810,7 +682,7 @@ bot.hears("📊 Status", async (ctx) => {
     statusText += `🟩 Available Numbers: <code>${availableNumbers}</code>\n`;
     statusText += `🟥 Used/Processing Numbers: <code>${usedNumbers}</code>\n`;
 
-    await ctx.reply(statusText, { parse_mode: "HTML" }).catch(()=>{});
+    await ctx.reply(statusText, { parse_mode: "HTML" }).catch(() => {});
 });
 
 bot.hears("⚙️ Switch to Admin Menu", async (ctx) => {
@@ -819,9 +691,9 @@ bot.hears("⚙️ Switch to Admin Menu", async (ctx) => {
     const userId = ctx.from.id;
     const dbData = readDb();
     if (dbData.admins.includes(userId) || userId === MASTER_ADMIN) {
-        await ctx.reply("⚙️ অ্যাডমিন প্যানেলে আপনাকে স্বাগতম!", adminReplyMenu).catch(()=>{});
+        await ctx.reply("⚙️ অ্যাডমিন প্যানেলে আপনাকে স্বাগতম!", adminReplyMenu).catch(() => {});
     } else {
-        await ctx.reply("❌ আপনি এই বটের অ্যাডমিন নন!").catch(()=>{});
+        await ctx.reply("❌ আপনি এই বটের অ্যাডমিন নন!").catch(() => {});
     }
 });
 
@@ -830,14 +702,14 @@ bot.hears("🛠️ Service Settings", async (ctx) => {
     delete adminState[ctx.from.id];
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    await ctx.reply("🛠️ <b>Service Settings Menu:</b>\nনিচের অপশনগুলো বেছে নিন:", { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(()=>{});
+    await ctx.reply("🛠️ <b>Service Settings Menu:</b>\nনিচের অপশনগুলো বেছে নিন:", { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(() => {});
 });
 
 bot.hears("📢 Admin Control", async (ctx) => {
     delete adminState[ctx.from.id];
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    await ctx.reply("📢 <b>Admin Control Panel:</b>\nনিচের অপশনগুলো বেছে নিন:", { parse_mode: "HTML", reply_markup: adminControlMenu.reply_markup }).catch(()=>{});
+    await ctx.reply("📢 <b>Admin Control Panel:</b>\nনিচের অপশনগুলো বেছে নিন:", { parse_mode: "HTML", reply_markup: adminControlMenu.reply_markup }).catch(() => {});
 });
 
 bot.hears("« Back to Main Menu", async (ctx) => {
@@ -846,9 +718,9 @@ bot.hears("« Back to Main Menu", async (ctx) => {
     const userId = ctx.from.id;
     const dbData = readDb();
     if (dbData.admins.includes(userId)) {
-        await ctx.reply("🔙 মূল অ্যাডমিন মেনুতে ফিরে আসা হয়েছে।", adminReplyMenu).catch(()=>{});
+        await ctx.reply("🔙 মূল অ্যাডমিন মেনুতে ফিরে আসা হয়েছে।", adminReplyMenu).catch(() => {});
     } else {
-        await ctx.reply("🔙 মূল ইউজার মেনুতে ফিরে আসা হয়েছে।", userReplyMenu).catch(()=>{});
+        await ctx.reply("🔙 মূল ইউজার মেনুতে ফিরে আসা হয়েছে।", userReplyMenu).catch(() => {});
     }
 });
 
@@ -856,37 +728,28 @@ bot.hears("📋 List Services", async (ctx) => {
     delete adminState[ctx.from.id];
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    
+
     let text = `📋 <b>Active Services & Rates</b>\n\n`;
     dbData.services.forEach((s, idx) => {
         const rate = dbData.serviceRates[s] ? `৳${dbData.serviceRates[s].toFixed(2)} BDT` : "Default (৳5.00)";
         text += `${idx + 1}. <b>${escapeHtml(s)}</b> - Rate: <code>${rate}</code>\n`;
     });
 
-    const countryRates = Object.entries(dbData.serviceRates).filter(([k]) => k.includes("_"));
-    if (countryRates.length > 0) {
-        text += `\n🌍 <b>Country Specific Rates:</b>\n`;
-        countryRates.forEach(([k, v]) => {
-            text += `• <code>${escapeHtml(k)}</code>: <b>৳${Number(v).toFixed(2)} BDT</b>\n`;
-        });
-    }
-    
-    await ctx.reply(text, { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(()=>{});
+    await ctx.reply(text, { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(() => {});
 });
 
 bot.hears("ℹ️ Help / Guide", async (ctx) => {
     delete adminState[ctx.from.id];
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    
+
     let helpText = `ℹ️ <b>Admin Help Guide</b>\n\n`;
     helpText += `1️⃣ <b>Add Number:</b> নম্বর বাল্ক ফরম্যাটে বা টেক্সট ফাইলে আপলোড করুন।\n`;
-    helpText += `2️⃣ <b>Modify Rate / Set Country Rate:</b> সার্ভিস অথবা সার্ভিস+কান্ট্রি প্রতি ওটিপি রেট সেট করুন।\n`;
+    helpText += `2️⃣ <b>Modify Rate:</b> সার্ভিস অথবা সার্ভিস+কান্ট্রি প্রতি ওটিপি রেট সেট করুন।\n`;
     helpText += `3️⃣ <b>Withdraw Requests:</b> পেন্ডিং উইথড্র রিকোয়েস্ট চেক ও প্রসেস করুন।\n`;
-    helpText += `4️⃣ <b>/adminmenu:</b> API, Delay, Number Quantity এবং Custom Message ম্যানেজ করুন।\n`;
-    helpText += `5️⃣ <b>iVASMS Panel:</b> iVASMS স্ট্যাটিস্টিক্স, মেসেজ ও API Key ম্যানেজ করুন।\n`;
+    helpText += `4️⃣ <b>/adminmenu:</b> API, iVASMS Key, Delay, Number Quantity এবং Custom Message ম্যানেজ করুন।\n`;
 
-    await ctx.reply(helpText, { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(()=>{});
+    await ctx.reply(helpText, { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(() => {});
 });
 
 bot.hears("👤 Admin List", async (ctx) => {
@@ -899,32 +762,32 @@ bot.hears("👤 Admin List", async (ctx) => {
         adminText += `${index + 1}. User ID: <code>${adminId}</code> ${adminId === MASTER_ADMIN ? "(Master Admin)" : ""}\n`;
     });
 
-    await ctx.reply(adminText, { parse_mode: "HTML", reply_markup: adminControlMenu.reply_markup }).catch(()=>{});
+    await ctx.reply(adminText, { parse_mode: "HTML", reply_markup: adminControlMenu.reply_markup }).catch(() => {});
 });
 
 bot.hears("🔄 Reset User State", async (ctx) => {
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    
+
     userState = {};
     adminState = {};
-    await ctx.reply("✅ বটের সমস্ত ইউজার এবং অ্যাডমিন স্টেট রিসেট করা হয়েছে।", adminControlMenu).catch(()=>{});
+    await ctx.reply("✅ বটের সমস্ত ইউজার এবং অ্যাডমিন স্টেট রিসেট করা হয়েছে।", adminControlMenu).catch(() => {});
 });
 
 bot.hears("📊 System Stats", async (ctx) => {
     delete adminState[ctx.from.id];
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    
+
     const pendingWd = dbData.withdrawals.filter(w => w.status === "pending").length;
-    
+
     let sysText = `🖥️ <b>System Overview Stats</b>\n\n`;
     sysText += `👥 Registered Users: <code>${dbData.users.length}</code>\n`;
     sysText += `👑 Total Admins: <code>${dbData.admins.length}</code>\n`;
     sysText += `⏳ Pending Withdrawals: <code>${pendingWd}</code>\n`;
     sysText += `⚡ Active Trackers: <code>${Object.keys(activeOtpCheckers).length}</code>\n`;
 
-    await ctx.reply(sysText, { parse_mode: "HTML", reply_markup: adminControlMenu.reply_markup }).catch(()=>{});
+    await ctx.reply(sysText, { parse_mode: "HTML", reply_markup: adminControlMenu.reply_markup }).catch(() => {});
 });
 
 async function showCountriesList(ctx, serviceName) {
@@ -941,53 +804,53 @@ async function showCountriesList(ctx, serviceName) {
     const countries = Object.keys(counts);
     if (countries.length === 0) {
         const text = `❌ দুঃখিত, এই মুহূর্তে ${targetService} সার্ভিসের কোনো নম্বর খালি নেই।`;
-        try { await ctx.editMessageText(text); } catch(e) { await ctx.reply(text).catch(()=>{}); }
+        try { await ctx.editMessageText(text); } catch (e) { await ctx.reply(text).catch(() => {}); }
         return;
     }
 
     const keyboard = new InlineKeyboard();
     countries.forEach((country) => {
         const flag = getCountryFlag(country);
-        
+
         let match = country.match(/\(([A-Z]{2})\)/);
         let isoCode = match ? match[1] : "BD";
-        
+
         const rateKey = `${targetService}_${country}`;
         const rate = dbData.serviceRates[rateKey] || dbData.serviceRates[targetService] || 5.00;
-        
+
         const btnLabel = `${flag} ${country.replace(/\s*\([A-Z]{2}\)\s*/g, "").trim()} (${isoCode}) | ৳${Number(rate).toFixed(2)} | Stock: ${counts[country]}`;
         const payload = encodePayload({ service: targetService, country });
-        
+
         keyboard.text(btnLabel, `gn|${payload}`).row();
     });
 
     const msg = `🌍 <b>${escapeHtml(targetService)}</b> সার্ভিসের জন্য একটি Country সিলেক্ট করুন:`;
-    try { await ctx.editMessageText(msg, { reply_markup: keyboard, parse_mode: "HTML" }); } catch(e) { await ctx.reply(msg, { reply_markup: keyboard, parse_mode: "HTML" }).catch(()=>{}); }
+    try { await ctx.editMessageText(msg, { reply_markup: keyboard, parse_mode: "HTML" }); } catch (e) { await ctx.reply(msg, { reply_markup: keyboard, parse_mode: "HTML" }).catch(() => {}); }
 }
 
 bot.callbackQuery(/^us\|/, async (ctx) => {
-    const data = decodePayload(ctx.callbackQuery.data.replace(/^us\|/, ""));
-    const serviceName = data?.service || "";
+    const parsed = decodePayload(ctx.callbackQuery.data.replace(/^us\|/, ""));
+    const serviceName = parsed?.service || "";
     await showCountriesList(ctx, serviceName);
-    ctx.answerCallbackQuery().catch(()=>{});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.callbackQuery(/^gn\|/, async (ctx) => {
-    const data = decodePayload(ctx.callbackQuery.data.replace(/^gn\|/, ""));
-    const service = data?.service || "";
-    const country = data?.country || "";
-    await deliverNumbers(ctx, service, country, true, false); 
-    ctx.answerCallbackQuery().catch(()=>{});
+    const parsed = decodePayload(ctx.callbackQuery.data.replace(/^gn\|/, ""));
+    const service = parsed?.service || "";
+    const country = parsed?.country || "";
+    await deliverNumbers(ctx, service, country, true, false);
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.callbackQuery(/^rf\|/, async (ctx) => {
-    const data = decodePayload(ctx.callbackQuery.data.replace(/^rf\|/, ""));
-    const service = data?.service || "";
-    const country = data?.country || "";
-    
+    const parsed = decodePayload(ctx.callbackQuery.data.replace(/^rf\|/, ""));
+    const service = parsed?.service || "";
+    const country = parsed?.country || "";
+
     let dbData = readDb();
     const userId = ctx.from.id;
-    
+
     dbData.numbers.forEach(n => {
         if (String(n.service || "").trim() === service.trim() && String(n.country || "").trim() === country.trim() && n.assigned_to === userId && n.status === "used") {
             if (activeOtpCheckers[n.id.toString().trim()]) {
@@ -1001,17 +864,17 @@ bot.callbackQuery(/^rf\|/, async (ctx) => {
     writeDb(dbData);
 
     await deliverNumbers(ctx, service, country, true, true);
-    ctx.answerCallbackQuery({ text: "🗑️ Old number removed & 🆕 new assigned!" }).catch(()=>{});
+    ctx.answerCallbackQuery({ text: "🗑️ Old number removed & 🆕 new assigned!" }).catch(() => {});
 });
 
 bot.callbackQuery(/^tp\|/, async (ctx) => {
-    const data = decodePayload(ctx.callbackQuery.data.replace(/^tp\|/, ""));
-    const service = data?.service || "";
-    const country = data?.country || "";
-    const currentHasPrefix = Boolean(data?.prefix);
+    const parsed = decodePayload(ctx.callbackQuery.data.replace(/^tp\|/, ""));
+    const service = parsed?.service || "";
+    const country = parsed?.country || "";
+    const currentHasPrefix = Boolean(parsed?.prefix);
 
     await deliverNumbers(ctx, service, country, !currentHasPrefix, false);
-    ctx.answerCallbackQuery().catch(()=>{});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 async function deliverNumbers(ctx, service, country, showWithPrefix = true, isRefresh = false) {
@@ -1025,26 +888,26 @@ async function deliverNumbers(ctx, service, country, showWithPrefix = true, isRe
 
     if (!isRefresh) {
         selectedNumbers = dbData.numbers.filter(
-            n => String(n.service || "").trim() === targetService && 
-            String(n.country || "").trim() === targetCountry && 
-            n.assigned_to === userId && 
+            n => String(n.service || "").trim() === targetService &&
+            String(n.country || "").trim() === targetCountry &&
+            n.assigned_to === userId &&
             n.status === "used"
         );
     }
 
     if (selectedNumbers.length === 0 || isRefresh) {
         const availableNumbers = dbData.numbers.filter(
-            n => String(n.service || "").trim() === targetService && 
-            String(n.country || "").trim() === targetCountry && 
+            n => String(n.service || "").trim() === targetService &&
+            String(n.country || "").trim() === targetCountry &&
             n.status === "available"
         );
 
         if (availableNumbers.length === 0) {
             const failText = `❌ দুঃখিত, এই মুহূর্তে ${targetService} (${targetCountry}) সার্ভিসের কোনো নতুন নম্বর খালি নেই।`;
             try {
-                await ctx.editMessageText(failText).catch(()=>{});
-            } catch(e) {
-                await ctx.reply(failText).catch(()=>{});
+                await ctx.editMessageText(failText).catch(() => {});
+            } catch (e) {
+                await ctx.reply(failText).catch(() => {});
             }
             return;
         }
@@ -1089,62 +952,22 @@ async function deliverNumbers(ctx, service, country, showWithPrefix = true, isRe
             userActiveMessages[userId] = sentMsg.message_id;
         }
     } catch (err) {
-        let sentMsg = await ctx.reply(deliveredText, { reply_markup: actionKeyboard, parse_mode: "HTML" }).catch(()=>{});
+        let sentMsg = await ctx.reply(deliveredText, { reply_markup: actionKeyboard, parse_mode: "HTML" }).catch(() => {});
         if (sentMsg && sentMsg.message_id) {
             userActiveMessages[userId] = sentMsg.message_id;
         }
     }
 }
 
-async function processOtpRecordActivation(activation, { cleanUserPhone = null, serviceName = null, fallbackUserId = null, countryName = null, cleanId = null, isGlobal = false }) {
+async function handleMatchedUserOtp(activation, cleanId, cleanUserPhone, serviceName, fallbackUserId, countryName) {
     let dbData = readDb();
-
     const rawMessage = activation ? (activation.content || activation.message) : null;
-    let rawPhone = (activation.number || activation.num || (cleanUserPhone || "Unknown")).toString();
-    let phoneNumber = rawPhone.replace(/[^\d]/g, "");
-
-    if (!isGlobal && cleanUserPhone) {
-        if (!phonesMatch(phoneNumber, cleanUserPhone)) return;
-        phoneNumber = cleanUserPhone;
-    }
-
     if (!rawMessage) return;
+
     const otpCode = extractOtp(rawMessage);
     if (!otpCode) return;
 
-    if (isGlobal) {
-        const uniqueKey = `global_${phoneNumber}_${otpCode}`;
-        if (dbData.sentOtps.includes(uniqueKey)) return;
-
-        dbData.sentOtps.push(uniqueKey);
-        if (dbData.sentOtps.length > 500) dbData.sentOtps.shift();
-        writeDb(dbData);
-
-        const detectedGlobalService = activation.cli || activation.service || activation.source || "Global";
-        const maskedGlobalPhone = phoneNumber !== "Unknown" ? maskPhoneNumber(phoneNumber) : "Unknown";
-        const safeService = escapeHtml(String(detectedGlobalService).toUpperCase());
-        const safeRawMsg = escapeHtml(rawMessage);
-
-        const globalMessage = `📢 <b>প্যানেল ওটিপি নোটিফিকেশন!</b> (Global Alert)\n📦 সার্ভিস: ${safeService}\n📞 নম্বর: <code>${maskedGlobalPhone}</code>\n\n💬 মেসেজ: <i>${safeRawMsg}</i>`;
-        const botUsername = botInfo ? botInfo.username : "Bot";
-
-        const inlineKeyboard = new InlineKeyboard()
-            .copyText(`${otpCode}`, `${otpCode}`).row()
-            .url(`👀 Number Bot`, `https://t.me/${botUsername}`)
-            .url(`✉️ Channel`, CHANNEL_CHAT_LINK);
-
-        try {
-            await bot.api.sendMessage(OTP_GROUP_ID, globalMessage, { reply_markup: inlineKeyboard, parse_mode: "HTML" });
-            await sleep(1500);
-        } catch (e) {
-            if (e.description && e.description.includes("Too Many Requests")) {
-                await sleep(6000);
-            }
-        }
-        return;
-    }
-
-    const uniqueKey = `${phoneNumber}_${otpCode}_${rawMessage}`;
+    const uniqueKey = `${cleanUserPhone}_${otpCode}_${rawMessage}`;
     if (dbData.sentOtps.includes(uniqueKey)) return;
 
     dbData.sentOtps.push(uniqueKey);
@@ -1152,13 +975,11 @@ async function processOtpRecordActivation(activation, { cleanUserPhone = null, s
         dbData.sentOtps.shift();
     }
 
-    const foundNum = cleanId ? dbData.numbers.find(n => n.id.toString() === cleanId) : null;
+    const foundNum = dbData.numbers.find(n => n.id.toString() === cleanId);
     const finalUserId = foundNum && foundNum.assigned_to ? foundNum.assigned_to : fallbackUserId;
-    const resolvedService = serviceName || (foundNum && foundNum.service) || "Service";
-    const resolvedCountry = countryName || (foundNum && foundNum.country) || "Global";
 
-    const rateKey = `${resolvedService}_${resolvedCountry}`;
-    const otpReward = dbData.serviceRates[rateKey] || dbData.serviceRates[resolvedService] || 5.00;
+    const rateKey = `${serviceName}_${countryName}`;
+    const otpReward = dbData.serviceRates[rateKey] || dbData.serviceRates[serviceName] || 5.00;
 
     if (!dbData.balances[finalUserId]) dbData.balances[finalUserId] = 0;
     dbData.balances[finalUserId] += otpReward;
@@ -1166,10 +987,10 @@ async function processOtpRecordActivation(activation, { cleanUserPhone = null, s
     writeDb(dbData);
 
     const botUsername = botInfo ? botInfo.username : "Bot";
-    const detectedService = escapeHtml(activation.cli || activation.source || resolvedService);
+    const detectedService = escapeHtml(activation.cli || serviceName);
     const safeRawMessage = escapeHtml(rawMessage);
-    const safeCountryName = escapeHtml(resolvedCountry);
-    const flag = getCountryFlag(resolvedCountry);
+    const safeCountryName = escapeHtml(countryName);
+    const flag = getCountryFlag(countryName);
 
     let baseOtpTemplate = dbData.customOtpMsg || "🚀 <b>FAST OTP RECEIVED!</b>\n\n📱 <code>{service}</code> | {flag} <code>{country}</code> | 📞 <code>+{phone}</code>\n\n💬 <i>\"{message}\"</i>\n\n👉 <code>{code}</code> <i>(Tap to Copy)</i>\n\n💰 <b>+৳{reward} BDT added to your balance!</b>";
 
@@ -1177,12 +998,12 @@ async function processOtpRecordActivation(activation, { cleanUserPhone = null, s
         .replace(/{service}/g, detectedService)
         .replace(/{country}/g, safeCountryName)
         .replace(/{flag}/g, flag)
-        .replace(/{phone}/g, phoneNumber)
+        .replace(/{phone}/g, cleanUserPhone)
         .replace(/{message}/g, safeRawMessage)
         .replace(/{code}/g, otpCode)
         .replace(/{reward}/g, otpReward.toFixed(2));
 
-    const maskedPhone = maskPhoneNumber(phoneNumber);
+    const maskedPhone = maskPhoneNumber(cleanUserPhone);
     let groupSuccessMessage = baseOtpTemplate
         .replace(/{service}/g, detectedService)
         .replace(/{country}/g, safeCountryName)
@@ -1197,15 +1018,56 @@ async function processOtpRecordActivation(activation, { cleanUserPhone = null, s
         .url(`👀 Number Bot`, `https://t.me/${botUsername}`)
         .url(`✉️ Channel`, CHANNEL_CHAT_LINK);
 
-    await bot.api.sendMessage(finalUserId, userSuccessMessage, { reply_markup: inlineKeyboardUser, parse_mode: "HTML" }).catch((e)=>console.error("User Send Error:", e.message));
-    await bot.api.sendMessage(OTP_GROUP_ID, groupSuccessMessage, { reply_markup: inlineKeyboardUser, parse_mode: "HTML" }).catch((e)=>console.error("Group Send Error:", e.message));
+    await bot.api.sendMessage(finalUserId, userSuccessMessage, { reply_markup: inlineKeyboardUser, parse_mode: "HTML" }).catch((e) => console.error("User Send Error:", e.message));
+    await bot.api.sendMessage(OTP_GROUP_ID, groupSuccessMessage, { reply_markup: inlineKeyboardUser, parse_mode: "HTML" }).catch((e) => console.error("Group Send Error:", e.message));
 }
 
-// --- Real OTP Fetch Logic via API ---
+async function handleGlobalPanelOtp(activation) {
+    let dbData = readDb();
+    const rawMessage = activation.content || activation.message;
+    let rawPhone = (activation.number || activation.num || "Unknown").toString();
+    let phoneNumber = rawPhone.replace(/[^\d]/g, "");
+
+    const serviceName = activation.cli || activation.service || "Global";
+    const otpCode = extractOtp(rawMessage);
+
+    if (!otpCode || !rawMessage) return;
+
+    const uniqueKey = `global_${phoneNumber}_${otpCode}`;
+    if (dbData.sentOtps.includes(uniqueKey)) return;
+
+    dbData.sentOtps.push(uniqueKey);
+    if (dbData.sentOtps.length > 500) dbData.sentOtps.shift();
+    writeDb(dbData);
+
+    const maskedGlobalPhone = phoneNumber !== "Unknown" ? maskPhoneNumber(phoneNumber) : "Unknown";
+    const safeService = escapeHtml(String(serviceName).toUpperCase());
+    const safeRawMsg = escapeHtml(rawMessage);
+
+    const globalMessage = `📢 <b>প্যানেল ওটিপি নোটিফিকেশন!</b> (Global Alert)\n📦 সার্ভিস: ${safeService}\n📞 নম্বর: <code>${maskedGlobalPhone}</code>\n\n💬 মেসেজ: <i>${safeRawMsg}</i>`;
+
+    const botUsername = botInfo ? botInfo.username : "Bot";
+
+    const inlineKeyboard = new InlineKeyboard()
+        .copyText(`${otpCode}`, `${otpCode}`).row()
+        .url(`👀 Number Bot`, `https://t.me/${botUsername}`)
+        .url(`✉️ Channel`, CHANNEL_CHAT_LINK);
+
+    try {
+        await bot.api.sendMessage(OTP_GROUP_ID, globalMessage, { reply_markup: inlineKeyboard, parse_mode: "HTML" });
+        await sleep(1500);
+    } catch (e) {
+        if (e.description && e.description.includes("Too Many Requests")) {
+            await sleep(6000);
+        }
+    }
+}
+
+// --- Real OTP Fetch Logic via API + iVASMS ---
 function startLiveOtpCheck(numberId, phoneNumber, serviceName, fallbackUserId, countryName) {
     const cleanId = numberId.toString().trim();
     const cleanUserPhone = phoneNumber.replace(/[^\d]/g, "");
-    
+
     if (activeOtpCheckers[cleanId]) clearInterval(activeOtpCheckers[cleanId]);
 
     let initialDb = readDb();
@@ -1226,35 +1088,33 @@ function startLiveOtpCheck(numberId, phoneNumber, serviceName, fallbackUserId, c
 
                     const response = await fetch(apiUrl);
                     const json = await response.json();
-                    
+
                     const recordList = (json && (json.records || json.data)) ? (json.records || json.data) : [];
-                    
+
                     if (Array.isArray(recordList)) {
-                        for (const activation of recordList) {
-                            await processOtpRecordActivation(activation, {
-                                cleanUserPhone,
-                                serviceName,
-                                fallbackUserId,
-                                countryName,
-                                cleanId,
-                                isGlobal: false
-                            });
+                        const matchedActivations = recordList.filter(item => {
+                            const rawPhone = item.number || item.num || "";
+                            const itemPhone = rawPhone.toString().replace(/[^\d]/g, "");
+                            if (itemPhone.length < 7 || cleanUserPhone.length < 7) return false;
+
+                            const p1 = itemPhone.substring(itemPhone.length - 7);
+                            const p2 = cleanUserPhone.substring(cleanUserPhone.length - 7);
+                            return p1 === p2;
+                        });
+
+                        for (const activation of matchedActivations) {
+                            await handleMatchedUserOtp(activation, cleanId, cleanUserPhone, serviceName, fallbackUserId, countryName);
                         }
                     }
                 } catch (e) {}
             }
 
-            if (dbData.ivasmsApiKey) {
-                const ivasmsMsgs = await getCachedIvasmsMessagesForPolling();
-                for (const m of ivasmsMsgs) {
-                    await processOtpRecordActivation(m, {
-                        cleanUserPhone,
-                        serviceName,
-                        fallbackUserId,
-                        countryName: countryName || m.range_name || "Global",
-                        cleanId,
-                        isGlobal: false
-                    });
+            // iVASMS Panel Messages Check
+            const ivasmsRecords = await fetchIvasmsMessagesRecords();
+            if (Array.isArray(ivasmsRecords) && ivasmsRecords.length > 0) {
+                const matchedIvasms = ivasmsRecords.filter(item => phonesMatch(item.number, cleanUserPhone));
+                for (const activation of matchedIvasms) {
+                    await handleMatchedUserOtp(activation, cleanId, cleanUserPhone, serviceName, fallbackUserId, countryName);
                 }
             }
         } catch (error) {}
@@ -1284,20 +1144,21 @@ function startGlobalPanelListener() {
 
                     if (Array.isArray(recordList)) {
                         for (const activation of recordList) {
-                            await processOtpRecordActivation(activation, { isGlobal: true });
+                            await handleGlobalPanelOtp(activation);
                         }
                     }
                 } catch (err) {}
             }
 
-            if (dbData.ivasmsApiKey) {
-                const ivasmsMsgs = await getCachedIvasmsMessagesForPolling();
-                for (const m of ivasmsMsgs) {
-                    await processOtpRecordActivation(m, { isGlobal: true });
+            // iVASMS Panel Global Messages -> Group
+            const ivasmsRecords = await fetchIvasmsMessagesRecords();
+            if (Array.isArray(ivasmsRecords) && ivasmsRecords.length > 0) {
+                for (const activation of ivasmsRecords) {
+                    await handleGlobalPanelOtp(activation);
                 }
             }
         } catch (err) {}
-    }, 12000); 
+    }, 12000);
 }
 
 bot.command("admin", async (ctx) => {
@@ -1305,9 +1166,9 @@ bot.command("admin", async (ctx) => {
     delete userState[ctx.from.id];
     const dbData = readDb();
     if (dbData.admins.includes(ctx.from.id)) {
-        await ctx.reply("⚙️ অ্যাডমিন প্যানেল ওপেন করা হয়েছে।", adminReplyMenu).catch(()=>{});
+        await ctx.reply("⚙️ অ্যাডমিন প্যানেল ওপেন করা হয়েছে।", adminReplyMenu).catch(() => {});
     } else {
-        await ctx.reply("❌ আপনি এই বটের অ্যাডমিন নন!").catch(()=>{});
+        await ctx.reply("❌ আপনি এই বটের অ্যাডমিন নন!").catch(() => {});
     }
 });
 
@@ -1315,77 +1176,60 @@ bot.hears("➕ Add Admin", async (ctx) => {
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
     adminState[ctx.from.id] = { step: "add_admin" };
-    await ctx.reply("👤 যাকে অ্যাডমিন বানাতে চান তার Telegram User ID-টি পাঠান:").catch(()=>{});
+    await ctx.reply("👤 যাকে অ্যাডমিন বানাতে চান তার Telegram User ID-টি পাঠান:").catch(() => {});
 });
 
 bot.hears("📢 Broadcast", async (ctx) => {
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
     adminState[ctx.from.id] = { step: "broadcast" };
-    await ctx.reply("📢 সব ইউজারের ইনবক্সে যে মেসেজটি পাঠাতে চান, তা এখানে টাইপ করে পাঠান:").catch(()=>{});
+    await ctx.reply("📢 সব ইউজারের ইনবক্সে যে মেসেজটি পাঠাতে চান, তা এখানে টাইপ করে পাঠান:").catch(() => {});
 });
 
 bot.hears("📱 Add Number", async (ctx) => {
     delete adminState[ctx.from.id];
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    await ctx.reply("কোন সার্ভিসের জন্য নম্বর যোগ করতে চান?", { reply_markup: getServicesKeyboard("ad") }).catch(()=>{});
+    await ctx.reply("কোন সার্ভিসের জন্য নম্বর যোগ করতে চান?", { reply_markup: getServicesKeyboard("ad") }).catch(() => {});
 });
 
 bot.hears("🗑️ Delete Service", async (ctx) => {
     delete adminState[ctx.from.id];
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    await ctx.reply("❌ যে সার্ভিসটি সম্পূর্ণভাবে মুছে ফেলতে চান তা সিলেক্ট করুন:", { reply_markup: getServicesKeyboard("ds") }).catch(()=>{});
+    await ctx.reply("❌ যে সার্ভিসটি সম্পূর্ণভাবে মুছে ফেলতে চান তা সিলেক্ট করুন:", { reply_markup: getServicesKeyboard("ds") }).catch(() => {});
 });
 
 bot.callbackQuery(/^ds\|/, async (ctx) => {
     let dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    const data = decodePayload(ctx.callbackQuery.data.replace(/^ds\|/, ""));
-    const serviceName = data?.service || "";
+    const parsed = decodePayload(ctx.callbackQuery.data.replace(/^ds\|/, ""));
+    const serviceName = parsed?.service || "";
 
     dbData.services = dbData.services.filter(s => s !== serviceName);
     dbData.numbers = dbData.numbers.filter(n => n.service !== serviceName);
     writeDb(dbData);
 
-    await ctx.editMessageText(`✅ <b>${escapeHtml(serviceName)}</b> সার্ভিস এবং এর সব নম্বর ডেটাবেজ থেকে মুছে ফেলা হয়েছে!`, { parse_mode: "HTML" }).catch(()=>{});
-    ctx.answerCallbackQuery().catch(()=>{});
+    await ctx.editMessageText(`✅ <b>${escapeHtml(serviceName)}</b> সার্ভিস এবং এর সব নম্বর ডেটাবেজ থেকে মুছে ফেলা হয়েছে!`, { parse_mode: "HTML" }).catch(() => {});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.hears("✏️ Modify OTP Rate", async (ctx) => {
     delete adminState[ctx.from.id];
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    await ctx.reply("✏️ যে সার্ভিসের OTP Rate পরিবর্তন করতে চান তা নির্বাচন করুন:", { reply_markup: getServicesKeyboard("rc") }).catch(()=>{});
-});
-
-bot.hears("💰 Set Country Rate", async (ctx) => {
-    delete adminState[ctx.from.id];
-    const dbData = readDb();
-    if (!dbData.admins.includes(ctx.from.id)) return;
-    await ctx.reply("💰 যে সার্ভিসের Country-wise OTP Rate সেট করতে চান তা নির্বাচন করুন:", { reply_markup: getServicesKeyboard("cr") }).catch(()=>{});
-});
-
-bot.callbackQuery(/^cr\|/, async (ctx) => {
-    const dbData = readDb();
-    if (!dbData.admins.includes(ctx.from.id)) return;
-    const data = decodePayload(ctx.callbackQuery.data.replace(/^cr\|/, ""));
-    const serviceName = data?.service || "";
-    adminState[ctx.from.id] = { service: serviceName, step: "input_country_rate_name" };
-    await ctx.editMessageText(`🌍 <b>${escapeHtml(serviceName)}</b> এর কোন Country-এর জন্য রেট সেট করতে চান? (যেমন: Mozambique বা Bangladesh):`, { parse_mode: "HTML" }).catch(()=>{});
-    ctx.answerCallbackQuery().catch(()=>{});
+    await ctx.reply("✏️ যে সার্ভিসের OTP Rate পরিবর্তন করতে চান তা নির্বাচন করুন:", { reply_markup: getServicesKeyboard("rc") }).catch(() => {});
 });
 
 bot.callbackQuery(/^rc\|/, async (ctx) => {
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    const data = decodePayload(ctx.callbackQuery.data.replace(/^rc\|/, ""));
-    const serviceName = data?.service || "";
+    const parsed = decodePayload(ctx.callbackQuery.data.replace(/^rc\|/, ""));
+    const serviceName = parsed?.service || "";
     adminState[ctx.from.id] = { service: serviceName, step: "input_new_rate_service" };
-    
-    await ctx.editMessageText(`✏️ <b>${escapeHtml(serviceName)}</b> এর জন্য প্রতি OTP এর BDT Rate কত দিতে চান? (যেমন: 5.5 বা 10):`, { parse_mode: "HTML" }).catch(()=>{});
-    ctx.answerCallbackQuery().catch(()=>{});
+
+    await ctx.editMessageText(`✏️ <b>${escapeHtml(serviceName)}</b> এর জন্য প্রতি OTP এর BDT Rate কত দিতে চান? (যেমন: 5.5 বা 10):`, { parse_mode: "HTML" }).catch(() => {});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.hears("💸 Withdraw Requests", async (ctx) => {
@@ -1396,7 +1240,7 @@ bot.hears("💸 Withdraw Requests", async (ctx) => {
     const pendingRequests = dbData.withdrawals.filter(w => w.status === "pending");
 
     if (pendingRequests.length === 0) {
-        await ctx.reply("✅ কোনো পেন্ডিং উইথড্র রিকোয়েস্ট নেই!").catch(()=>{});
+        await ctx.reply("✅ কোনো পেন্ডিং উইথড্র রিকোয়েস্ট নেই!").catch(() => {});
         return;
     }
 
@@ -1409,41 +1253,41 @@ bot.hears("💸 Withdraw Requests", async (ctx) => {
         msg += `📅 <b>Date:</b> ${req.date}\n\n`;
     });
 
-    await ctx.reply(msg, { parse_mode: "HTML" }).catch(()=>{});
+    await ctx.reply(msg, { parse_mode: "HTML" }).catch(() => {});
 });
 
 bot.callbackQuery(/^ad\|/, async (ctx) => {
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    const data = decodePayload(ctx.callbackQuery.data.replace(/^ad\|/, ""));
-    const serviceName = data?.service || "";
+    const parsed = decodePayload(ctx.callbackQuery.data.replace(/^ad\|/, ""));
+    const serviceName = parsed?.service || "";
     adminState[ctx.from.id] = { service: serviceName, step: "input_country" };
-    await ctx.editMessageText(`📦 সার্ভিস সিলেক্ট করেছেন: <b>${escapeHtml(serviceName)}</b>\n\n🌍 এখন দেশের নাম টাইপ করে পাঠান:`, { parse_mode: "HTML" }).catch(()=>{});
-    ctx.answerCallbackQuery().catch(()=>{});
+    await ctx.editMessageText(`📦 সার্ভিস সিলেক্ট করেছেন: <b>${escapeHtml(serviceName)}</b>\n\n🌍 এখন দেশের নাম টাইপ করে পাঠান:`, { parse_mode: "HTML" }).catch(() => {});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.hears("➕ Add Service", async (ctx) => {
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
     adminState[ctx.from.id] = { step: "input_new_service" };
-    await ctx.reply("➕ যে নতুন সার্ভিসটি যোগ করতে চান তার নাম লিখুন:").catch(()=>{});
+    await ctx.reply("➕ যে নতুন সার্ভিসটি যোগ করতে চান তার নাম লিখুন:").catch(() => {});
 });
 
 bot.hears("❌ Delete Numbers", async (ctx) => {
     delete adminState[ctx.from.id];
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    await ctx.reply("❌ কোন সার্ভিসের নম্বর ডিলিট করতে চান?", { reply_markup: getServicesKeyboard("dl") }).catch(()=>{});
+    await ctx.reply("❌ কোন সার্ভিসের নম্বর ডিলিট করতে চান?", { reply_markup: getServicesKeyboard("dl") }).catch(() => {});
 });
 
 bot.callbackQuery(/^dl\|/, async (ctx) => {
     const dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    const data = decodePayload(ctx.callbackQuery.data.replace(/^dl\|/, ""));
-    const serviceName = data?.service || "";
+    const parsed = decodePayload(ctx.callbackQuery.data.replace(/^dl\|/, ""));
+    const serviceName = parsed?.service || "";
     const countries = [...new Set(dbData.numbers.filter(n => n.service === serviceName).map(n => n.country))];
     if (countries.length === 0) {
-        await ctx.editMessageText(`❌ ${serviceName} সার্ভিসের আন্ডারে কোনো নম্বর নেই।`).catch(()=>{});
+        await ctx.editMessageText(`❌ ${serviceName} সার্ভিসের আন্ডারে কোনো নম্বর নেই।`).catch(() => {});
         return;
     }
     const keyboard = new InlineKeyboard();
@@ -1453,16 +1297,16 @@ bot.callbackQuery(/^dl\|/, async (ctx) => {
         if (index % 2 !== 0) keyboard.row();
     });
     keyboard.row().text("🗑️ সব নম্বর একসাথে মুছুন", `cd|${encodePayload({ service: serviceName, country: "ALL" })}`);
-    await ctx.editMessageText(`❌ কোন দেশের নম্বরগুলো মুছতে চান?`, { reply_markup: keyboard }).catch(()=>{});
-    ctx.answerCallbackQuery().catch(()=>{});
+    await ctx.editMessageText(`❌ কোন দেশের নম্বরগুলো মুছতে চান?`, { reply_markup: keyboard }).catch(() => {});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 bot.callbackQuery(/^cd\|/, async (ctx) => {
     let dbData = readDb();
     if (!dbData.admins.includes(ctx.from.id)) return;
-    const data = decodePayload(ctx.callbackQuery.data.replace(/^cd\|/, ""));
-    const service = data?.service || "";
-    const country = data?.country || "";
+    const parsed = decodePayload(ctx.callbackQuery.data.replace(/^cd\|/, ""));
+    const service = parsed?.service || "";
+    const country = parsed?.country || "";
 
     if (country === "ALL") {
         dbData.numbers = dbData.numbers.filter(n => n.service !== service);
@@ -1470,8 +1314,8 @@ bot.callbackQuery(/^cd\|/, async (ctx) => {
         dbData.numbers = dbData.numbers.filter(n => !(n.service === service && n.country === country));
     }
     writeDb(dbData);
-    await ctx.editMessageText(`✅ সফলভাবে ডেটাবেজ আপডেট করা হয়েছে।`).catch(()=>{});
-    ctx.answerCallbackQuery().catch(()=>{});
+    await ctx.editMessageText(`✅ সফলভাবে ডেটাবেজ আপডেট করা হয়েছে।`).catch(() => {});
+    ctx.answerCallbackQuery().catch(() => {});
 });
 
 async function processNumbersWithCountry(ctx, textData, serviceName, typedCountryName) {
@@ -1505,20 +1349,20 @@ async function processNumbersWithCountry(ctx, textData, serviceName, typedCountr
             const info = parsePhoneNumberInfo(phone);
             const formattedCountryName = `${cleanTypedName} (${info.isoCode})`;
 
-            dbData.numbers.push({ 
-                id: numId, 
-                country: formattedCountryName, 
-                service: serviceName, 
-                phone_number: phone, 
-                status: "available", 
-                assigned_to: null 
+            dbData.numbers.push({
+                id: numId,
+                country: formattedCountryName,
+                service: serviceName,
+                phone_number: phone,
+                status: "available",
+                assigned_to: null
             });
             addedCount++;
         }
     });
 
     writeDb(dbData);
-    await ctx.reply(`📊 সফলভাবে ${addedCount} টি নম্বর যোগ হয়েছে।`, adminReplyMenu).catch(()=>{});
+    await ctx.reply(`📊 সফলভাবে ${addedCount} টি নম্বর যোগ হয়েছে।`, adminReplyMenu).catch(() => {});
 }
 
 bot.on(["message:text", "message:document"], async (ctx) => {
@@ -1526,9 +1370,9 @@ bot.on(["message:text", "message:document"], async (ctx) => {
     const userText = ctx.message.text || "";
 
     if (userText === "👤 Switch to User Menu") {
-        delete adminState[userId]; 
+        delete adminState[userId];
         delete userState[userId];
-        await ctx.reply("📱 ইউজার প্যানেলে আপনাকে স্বাগতম।", userReplyMenu).catch(()=>{});
+        await ctx.reply("📱 ইউজার প্যানেলে আপনাকে স্বাগতম।", userReplyMenu).catch(() => {});
         return;
     }
 
@@ -1538,14 +1382,14 @@ bot.on(["message:text", "message:document"], async (ctx) => {
         const currentBalance = dbData.balances[userId] || 0;
 
         if (currentBalance < 100) {
-            await ctx.reply("❌ উইথড্র করার জন্য ন্যূনতম ৳100 BDT ব্যালেন্স থাকতে হবে।", userReplyMenu).catch(()=>{});
+            await ctx.reply("❌ উইথড্র করার জন্য ন্যূনতম ৳100 BDT ব্যালেন্স থাকতে হবে।", userReplyMenu).catch(() => {});
             delete userState[userId];
             return;
         }
 
         const withdrawAmount = currentBalance;
         dbData.balances[userId] = 0;
-        
+
         const reqId = "WD-" + Math.floor(100000 + Math.random() * 900000);
         const reqData = {
             id: reqId,
@@ -1561,12 +1405,12 @@ bot.on(["message:text", "message:document"], async (ctx) => {
 
         delete userState[userId];
 
-        await ctx.reply(`✅ <b>উইথড্র রিকোয়েস্ট সফলভাবে জমা হয়েছে!</b>\n\n🆔 Request ID: <code>${reqId}</code>\n💰 Amount: <code>৳${withdrawAmount.toFixed(2)}</code> BDT\n💳 Account Info: <code>${escapeHtml(binanceId)}</code>\n\nঅ্যাডমিন শীঘ্রই এটি ভেরিফাই করে পেমেন্ট বানিয়ে দেবে।`, { parse_mode: "HTML", reply_markup: userReplyMenu.reply_markup }).catch(()=>{});
+        await ctx.reply(`✅ <b>উইথড্র রিকোয়েস্ট সফলভাবে জমা হয়েছে!</b>\n\n🆔 Request ID: <code>${reqId}</code>\n💰 Amount: <code>৳${withdrawAmount.toFixed(2)}</code> BDT\n💳 Account Info: <code>${escapeHtml(binanceId)}</code>\n\nঅ্যাডমিন শীঘ্রই এটি ভেরিফাই করে পেমেন্ট বানিয়ে দেবে।`, { parse_mode: "HTML", reply_markup: userReplyMenu.reply_markup }).catch(() => {});
 
         for (const adminId of dbData.admins) {
             try {
                 await bot.api.sendMessage(adminId, `🔔 <b>নতুন উইথড্র রিকোয়েস্ট এসেছে!</b>\n\n👤 User: <code>${userId}</code>\n💰 Amount: <code>৳${withdrawAmount.toFixed(2)}</code> BDT\n💳 Account Info: <code>${escapeHtml(binanceId)}</code>`, { parse_mode: "HTML" });
-            } catch(e){}
+            } catch (e) {}
         }
         return;
     }
@@ -1575,36 +1419,11 @@ bot.on(["message:text", "message:document"], async (ctx) => {
     let dbData = readDb();
     if (!state) return;
 
-    if (state.step === "input_country_rate_name" && ctx.message.text) {
-        state.country = ctx.message.text.trim();
-        state.step = "input_country_rate_value";
-        await ctx.reply(`💵 <b>${escapeHtml(state.service)} (${escapeHtml(state.country)})</b> এর জন্য প্রতি OTP রেট কত BDT দিতে চান?`, { parse_mode: "HTML" }).catch(()=>{});
-        return;
-    }
-
-    if (state.step === "input_country_rate_value" && ctx.message.text) {
-        const rate = parseFloat(ctx.message.text.trim());
-        if (!isNaN(rate) && rate > 0) {
-            const matchedNum = dbData.numbers.find(
-                n => n.service === state.service && n.country.toLowerCase().includes(state.country.toLowerCase())
-            );
-            const fullCountryKey = matchedNum ? matchedNum.country : state.country;
-            dbData.serviceRates[`${state.service}_${fullCountryKey}`] = rate;
-            dbData.serviceRates[`${state.service}_${state.country}`] = rate;
-            writeDb(dbData);
-            await ctx.reply(`✅ <b>${escapeHtml(state.service)} (${escapeHtml(fullCountryKey)})</b> এর OTP Rate সেট করা হয়েছে: <b>৳${rate.toFixed(2)} BDT</b>`, { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(()=>{});
-        } else {
-            await ctx.reply("❌ সঠিক সংখ্যা লিখুন (যেমন: 5.50)।").catch(()=>{});
-        }
-        delete adminState[userId];
-        return;
-    }
-
     if (state.step === "awaiting_ivasms_key" && ctx.message.text) {
         dbData.ivasmsApiKey = ctx.message.text.trim();
         writeDb(dbData);
         delete adminState[userId];
-        await ctx.reply("✅ iVASMS API Key সফলভাবে আপডেট করা হয়েছে!", adminReplyMenu).catch(()=>{});
+        await ctx.reply("✅ iVASMS API Key সফলভাবে আপডেট করা হয়েছে!", adminReplyMenu).catch(() => {});
         return;
     }
 
@@ -1614,9 +1433,9 @@ bot.on(["message:text", "message:document"], async (ctx) => {
             dbData.numberQty = qtyNum;
             writeDb(dbData);
             delete adminState[userId];
-            await ctx.reply(`✅ প্রতি ক্লিকে 'Get Number' ডেলিভারি সংখ্যা সেভ করা হয়েছে: <b>${qtyNum} টি</b>`, { parse_mode: "HTML" }).catch(()=>{});
+            await ctx.reply(`✅ প্রতি ক্লিকে 'Get Number' ডেলিভারি সংখ্যা সেভ করা হয়েছে: <b>${qtyNum} টি</b>`, { parse_mode: "HTML" }).catch(() => {});
         } else {
-            await ctx.reply("❌ সঠিক ইনপুট দিন (যেমন: 1, 3, বা 5)।").catch(()=>{});
+            await ctx.reply("❌ সঠিক ইনপুট দিন (যেমন: 1, 3, বা 5)।").catch(() => {});
         }
         return;
     }
@@ -1626,7 +1445,7 @@ bot.on(["message:text", "message:document"], async (ctx) => {
         dbData.apiUrls.push(newUrl);
         writeDb(dbData);
         delete adminState[userId];
-        await ctx.reply(`✅ নতুন API URL যুক্ত করা হয়েছে:\n<code>${newUrl}</code>`, { parse_mode: "HTML" }).catch(()=>{});
+        await ctx.reply(`✅ নতুন API URL যুক্ত করা হয়েছে:\n<code>${newUrl}</code>`, { parse_mode: "HTML" }).catch(() => {});
         return;
     }
 
@@ -1636,9 +1455,9 @@ bot.on(["message:text", "message:document"], async (ctx) => {
             dbData.checkDelay = delay;
             writeDb(dbData);
             delete adminState[userId];
-            await ctx.reply(`✅ OTP চেক করার ডিলে সেট করা হয়েছে: <b>${delay} ms</b>`, { parse_mode: "HTML" }).catch(()=>{});
+            await ctx.reply(`✅ OTP চেক করার ডিলে সেট করা হয়েছে: <b>${delay} ms</b>`, { parse_mode: "HTML" }).catch(() => {});
         } else {
-            await ctx.reply("❌ সঠিক ইনপুট দিন (সর্বনিম্ন 1000 ms)।").catch(()=>{});
+            await ctx.reply("❌ সঠিক ইনপুট দিন (সর্বনিম্ন 1000 ms)।").catch(() => {});
         }
         return;
     }
@@ -1647,55 +1466,50 @@ bot.on(["message:text", "message:document"], async (ctx) => {
         dbData.customOtpMsg = ctx.message.text;
         writeDb(dbData);
         delete adminState[userId];
-        await ctx.reply("✅ ওটিপি মেসেজ টেমপ্লেট সফলভাবে কাস্টমাইজ করা হয়েছে! (ইউজার ও গ্রুপ উভয় জায়গায় এপ্লাই হবে)").catch(()=>{});
+        await ctx.reply("✅ ওটিপি মেসেজ টেমপ্লেট সফলভাবে কাস্টমাইজ করা হয়েছে! (ইউজার ও গ্রুপ উভয় জায়গায় এপ্লাই হবে)").catch(() => {});
         return;
     }
 
     if (state.step === "input_new_service" && ctx.message.text) {
         dbData.services.push(ctx.message.text.trim());
         writeDb(dbData);
-        await ctx.reply("✅ নতুন সার্ভিস যুক্ত হয়েছে।", serviceSettingsMenu).catch(()=>{});
+        await ctx.reply("✅ নতুন সার্ভিস যুক্ত হয়েছে।", serviceSettingsMenu).catch(() => {});
         delete adminState[userId];
-    }
-    else if (state.step === "input_new_rate_service" && ctx.message.text) {
+    } else if (state.step === "input_new_rate_service" && ctx.message.text) {
         const rate = parseFloat(ctx.message.text.trim());
         if (!isNaN(rate) && rate > 0) {
             dbData.serviceRates[state.service] = rate;
             writeDb(dbData);
-            await ctx.reply(`✅ <b>${escapeHtml(state.service)}</b> সার্ভিসের নতুন OTP Rate set করা হয়েছে: <b>৳${rate.toFixed(2)} BDT</b>`, { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(()=>{});
+            await ctx.reply(`✅ <b>${escapeHtml(state.service)}</b> সার্ভিসের নতুন OTP Rate set করা হয়েছে: <b>৳${rate.toFixed(2)} BDT</b>`, { parse_mode: "HTML", reply_markup: serviceSettingsMenu.reply_markup }).catch(() => {});
         } else {
-            await ctx.reply("❌ রেট টি সঠিকভাবে লিখুন (যেমন: 5.50)।").catch(()=>{});
+            await ctx.reply("❌ রেট টি সঠিকভাবে লিখুন (যেমন: 5.50)।").catch(() => {});
         }
         delete adminState[userId];
-    }
-    else if (state.step === "add_admin" && ctx.message.text) {
+    } else if (state.step === "add_admin" && ctx.message.text) {
         const newAdminId = parseInt(ctx.message.text.trim());
         if (!isNaN(newAdminId) && !dbData.admins.includes(newAdminId)) {
             dbData.admins.push(newAdminId);
             writeDb(dbData);
-            await ctx.reply("✅ নতুন অ্যাডমিন যুক্ত হয়েছে।", adminControlMenu).catch(()=>{});
+            await ctx.reply("✅ নতুন অ্যাডমিন যুক্ত হয়েছে।", adminControlMenu).catch(() => {});
         } else {
-            await ctx.reply("❌ আইডি সঠিক নয় অথবা ইতিমধ্যে অ্যাডমিন আছেন।", adminControlMenu).catch(()=>{});
+            await ctx.reply("❌ আইডি সঠিক নয় অথবা ইতিমধ্যে অ্যাডমিন আছেন।", adminControlMenu).catch(() => {});
         }
         delete adminState[userId];
-    }
-    else if (state.step === "broadcast" && ctx.message.text) {
-        await ctx.reply("📢 ব্রডকাস্ট পাঠানো শুরু হয়েছে...").catch(()=>{});
-        for (const uId of dbData.users) { 
-            try { await bot.api.sendMessage(uId, ctx.message.text); } catch(e){} 
+    } else if (state.step === "broadcast" && ctx.message.text) {
+        await ctx.reply("📢 ব্রডকাস্ট পাঠানো শুরু হয়েছে...").catch(() => {});
+        for (const uId of dbData.users) {
+            try { await bot.api.sendMessage(uId, ctx.message.text); } catch (e) {}
         }
-        await ctx.reply("📢 ব্রডকাস্ট সম্পন্ন!", adminControlMenu).catch(()=>{});
+        await ctx.reply("📢 ব্রডকাস্ট সম্পন্ন!", adminControlMenu).catch(() => {});
         delete adminState[userId];
-    }
-    else if (state.step === "input_country" && ctx.message.text) {
+    } else if (state.step === "input_country" && ctx.message.text) {
         state.country = ctx.message.text.trim();
         state.step = "input_rate";
-        await ctx.reply(`💵 <b>${escapeHtml(state.service)} (${escapeHtml(state.country)})</b> এর জন্য প্রতি OTP তে কত BDT দিতে চান? (যেমন: 5.5 বা 10):`, { parse_mode: "HTML" }).catch(()=>{});
-    }
-    else if (state.step === "input_rate" && ctx.message.text) {
+        await ctx.reply(`💵 <b>${escapeHtml(state.service)} (${escapeHtml(state.country)})</b> এর জন্য প্রতি OTP তে কত BDT দিতে চান? (যেমন: 5.5 বা 10):`, { parse_mode: "HTML" }).catch(() => {});
+    } else if (state.step === "input_rate" && ctx.message.text) {
         const rate = parseFloat(ctx.message.text.trim());
         if (isNaN(rate) || rate <= 0) {
-            await ctx.reply("❌ সঠিক সংখ্যা লিখুন (যেমন: 5 বা 6.5)।").catch(()=>{});
+            await ctx.reply("❌ সঠিক সংখ্যা লিখুন (যেমন: 5 বা 6.5)।").catch(() => {});
             return;
         }
         const rateKey = `${state.service}_${state.country}`;
@@ -1704,9 +1518,8 @@ bot.on(["message:text", "message:document"], async (ctx) => {
         writeDb(dbData);
 
         state.step = "input_numbers";
-        await ctx.reply(`✅ Per OTP Rate: <b>৳${rate.toFixed(2)} BDT</b> সেভ করা হয়েছে!\n\n🔢 এখন নম্বরগুলো পেস্ট করুন বা ফাইল দিন:`, { parse_mode: "HTML" }).catch(()=>{});
-    }
-    else if (state.step === "input_numbers") {
+        await ctx.reply(`✅ Per OTP Rate: <b>৳${rate.toFixed(2)} BDT</b> সেভ করা হয়েছে!\n\n🔢 এখন নম্বরগুলো পেস্ট করুন বা ফাইল দিন:`, { parse_mode: "HTML" }).catch(() => {});
+    } else if (state.step === "input_numbers") {
         let textData = ctx.message.text || "";
         if (ctx.message.document) {
             try {
@@ -1726,7 +1539,7 @@ bot.catch((err) => {
 
 bot.start({
     onStart: async (info) => {
-        botInfo = info; 
+        botInfo = info;
         console.log(`🚀 Node.js Telegram OTP Bot Online (@${info.username})!`);
 
         await bot.api.setMyCommands([
@@ -1735,6 +1548,6 @@ bot.start({
             { command: "admin", description: "⚙️ Admin Keyboard Panel" }
         ]).catch((e) => console.error("Commands set failed:", e.message));
 
-        startGlobalPanelListener(); 
+        startGlobalPanelListener();
     }
 });
