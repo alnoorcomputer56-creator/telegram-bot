@@ -1,7 +1,7 @@
 {
   "name": "telegram-otp-bot",
   "version": "1.0.0",
-  "description": "Telegram OTP Bot with iVASMS and Multi-Panel API support",
+  "description": "Node.js Telegram OTP Bot",
   "main": "bot.js",
   "scripts": {
     "start": "node bot.js"
