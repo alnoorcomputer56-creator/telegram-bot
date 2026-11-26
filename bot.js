@@ -18,7 +18,12 @@ if (!BOT_TOKEN) {
 }
 
 const bot = new Bot(BOT_TOKEN);
-const DB_FILE = path.join(__dirname, "bot_database.json");
+const DATA_DIR = fs.existsSync("/app/data")
+    ? "/app/data"
+    : fs.existsSync("/data")
+    ? "/data"
+    : __dirname;
+const DB_FILE = path.join(DATA_DIR, "bot_database.json");
 
 let activeOtpCheckers = {};
 let botInfo = null;
@@ -305,8 +310,12 @@ function readDb() {
         if (!Array.isArray(data.apiUrls) || data.apiUrls.length === 0) data.apiUrls = [...defaultApis];
         if (!Array.isArray(data.ivasmsApiUrls)) data.ivasmsApiUrls = [];
         if (typeof data.ivasmsApiKey !== "string") data.ivasmsApiKey = "";
-        if (!data.checkDelay) data.checkDelay = 4000;
-        if (!data.numberQty) data.numberQty = 1;
+        if (typeof data.numberQty !== "number" || isNaN(data.numberQty) || data.numberQty < 1) {
+            data.numberQty = 1;
+        }
+        if (typeof data.checkDelay !== "number" || isNaN(data.checkDelay) || data.checkDelay < 1000) {
+            data.checkDelay = 4000;
+        }
         if (!data.customOtpMsg) data.customOtpMsg = defaultMsg;
         return data;
     } catch (e) {
@@ -547,6 +556,7 @@ bot.callbackQuery("adm_view_config", async (ctx) => {
     const dbData = readDb();
     const maskedKey = dbData.ivasmsApiKey ? `${dbData.ivasmsApiKey.slice(0, 12)}...${dbData.ivasmsApiKey.slice(-4)}` : "Not Set";
     let text = `⚙️ <b>বর্তমান সিস্টেম কনফিগারেশন</b>\n\n`;
+    text += `📁 <b>DB Path:</b> <code>${escapeHtml(DB_FILE)}</code>\n`;
     text += `⏱️ <b>Polling Delay:</b> <code>${dbData.checkDelay} ms</code>\n`;
     text += `🔢 <b>Get Number Qty:</b> <code>${dbData.numberQty || 1}</code>\n`;
     text += `🔑 <b>iVASMS Key:</b> <code>${escapeHtml(maskedKey)}</code>\n\n`;
@@ -1501,6 +1511,7 @@ bot.start({
     onStart: async (info) => {
         botInfo = info;
         console.log(`🚀 Node.js Telegram OTP Bot Online (@${info.username})!`);
+        console.log(`📁 Using database file: ${DB_FILE}`);
 
         await bot.api.setMyCommands([
             { command: "start", description: "🚀 Start the Bot" },
